@@ -12,7 +12,8 @@ module.exports = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   jwtSecret: process.env.JWT_SECRET || 'dev-jwt-secret-nao-usar-em-producao',
   sessionSecret: process.env.SESSION_SECRET || 'dev-session-secret-nao-usar-em-producao',
-  demoMode: process.env.DEMO_MODE === 'true' && !isProduction,
+  // Em producao o modo demo exige opt-in explicito (DEMO_PUBLICO=true), para hospedagem de demonstracao.
+  demoMode: process.env.DEMO_MODE === 'true' && (!isProduction || process.env.DEMO_PUBLICO === 'true'),
   timezone: process.env.TZ_APP || 'America/Sao_Paulo',
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,

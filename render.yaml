@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: tcc-senai
+    runtime: node
+    plan: free
+    buildCommand: npm run install:all && npm run build
+    startCommand: npm run setup --prefix backend && npm start --prefix backend
+    healthCheckPath: /api/auth/config
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20
+      - key: DEMO_MODE
+        value: "true"
+      - key: DEMO_PUBLICO
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
