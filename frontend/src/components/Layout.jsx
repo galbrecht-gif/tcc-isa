@@ -10,12 +10,17 @@ import {
   UserCog,
   ScrollText,
   LayoutDashboard,
-  ShieldCheck,
   LogIn,
+  RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { mensagemErro } from '../services/api';
 import { ROLES } from '../utils/format';
 import NotificationBell from './NotificationBell';
+import Marca from './Marca';
+import { ConfirmModal } from './Modal';
 
 const NAV = {
   aluno: [
@@ -38,23 +43,51 @@ const NAV = {
 };
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, demoMode, demoUsuarios, loginDemo, resetarDemo } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [aberta, setAberta] = useState(true);
   const [mobile, setMobile] = useState(false);
+  const [confirmarReset, setConfirmarReset] = useState(false);
+  const [resetando, setResetando] = useState(false);
 
   const sair = async () => {
     await logout();
     navigate('/login');
   };
 
+  const trocarPerfil = async (e) => {
+    const alvo = demoUsuarios.find((u) => String(u.id) === e.target.value);
+    if (!alvo || alvo.id === user.id) return;
+    try {
+      navigate(await loginDemo(alvo.role, alvo.id));
+    } catch (err) {
+      toast.erro(mensagemErro(err));
+    }
+  };
+
+  const restaurar = async () => {
+    setResetando(true);
+    try {
+      navigate(await resetarDemo());
+      toast.sucesso('Dados de demonstração restaurados.');
+    } catch (err) {
+      toast.erro(mensagemErro(err));
+    } finally {
+      setResetando(false);
+      setConfirmarReset(false);
+    }
+  };
+
+  const perfisDemo = ['gestor', 'professor', 'portaria', 'aluno'].map((role) => ({
+    role,
+    usuarios: demoUsuarios.filter((u) => u.role === role),
+  }));
+
   return (
     <div className={`app ${aberta ? '' : 'sidebar-recolhida'} ${mobile ? 'sidebar-mobile-aberta' : ''}`}>
       <aside className="sidebar">
-        <div className="sidebar-marca">
-          <ShieldCheck size={26} />
-          <span>SENAI</span>
-        </div>
+        <Marca claro subtitulo="Controle de Frequência" />
         <nav>
           {NAV[user.role].map(({ to, label, icon: Icone, end }) => (
             <NavLink key={to} to={to} end={end} className="nav-item" title={label} onClick={() => setMobile(false)}>
@@ -79,6 +112,34 @@ export default function Layout() {
             <Menu size={22} />
           </button>
           <div className="topo-direita">
+            {demoMode && (
+              <div className="demo-topo">
+                <Sparkles size={16} />
+                <select value={user.id} onChange={trocarPerfil} aria-label="Trocar perfil (demonstração)">
+                  {!demoUsuarios.some((u) => u.id === user.id) && (
+                    <option value={user.id} hidden>
+                      {user.nome}
+                    </option>
+                  )}
+                  {perfisDemo.map(({ role, usuarios }) =>
+                    usuarios.length ? (
+                      <optgroup key={role} label={ROLES[role]}>
+                        {usuarios.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.nome}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null
+                  )}
+                </select>
+                {user.role === 'gestor' && (
+                  <button className="icon-btn" title="Restaurar dados de demonstração" onClick={() => setConfirmarReset(true)}>
+                    <RotateCcw size={18} />
+                  </button>
+                )}
+              </div>
+            )}
             <NotificationBell />
             <div className="usuario-info">
               <strong>{user.nome}</strong>
@@ -90,6 +151,17 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      {confirmarReset && (
+        <ConfirmModal
+          titulo="Restaurar dados de demonstração"
+          mensagem="Todas as solicitações, entradas, notificações e alterações de usuários serão apagadas e os dados de exemplo serão recriados."
+          confirmar="Restaurar"
+          perigo
+          carregando={resetando}
+          onConfirm={restaurar}
+          onClose={() => setConfirmarReset(false)}
+        />
+      )}
     </div>
   );
 }

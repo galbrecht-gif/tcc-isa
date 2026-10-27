@@ -28,8 +28,10 @@ function localParaISO(valor) {
   if (!valor || typeof valor !== 'string') return null;
   const texto = /^\d{2}:\d{2}$/.test(valor.trim()) ? `${hojeSP()}T${valor.trim()}` : valor.trim();
   if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$/.test(texto)) return null;
-  const d = dayjs.tz(texto.replace(' ', 'T'), TZ);
-  return d.isValid() ? d.toDate().toISOString() : null;
+  const normalizado = texto.replace(' ', 'T');
+  const d = dayjs.tz(normalizado, TZ);
+  const esperado = normalizado.length === 16 ? `${normalizado}:00` : normalizado;
+  return d.isValid() && d.format('YYYY-MM-DDTHH:mm:ss') === esperado ? d.toDate().toISOString() : null;
 }
 
 const formatarSP = (iso) => (iso ? dayjs(iso).tz(TZ).format('DD/MM/YYYY HH:mm') : '');

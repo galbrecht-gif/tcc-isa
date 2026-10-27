@@ -85,4 +85,6 @@ router.delete('/usuarios/:id', exigirRole('gestor'), usuarios.remover);
 
 router.get('/logs', exigirRole('gestor'), logs.listar);
 
+router.post('/demo/reset', exigirRole('gestor'), auth.demoReset);
+
 module.exports = router;

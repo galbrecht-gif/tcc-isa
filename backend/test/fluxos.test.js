@@ -12,7 +12,7 @@ process.env.NODE_ENV = 'test';
 const db = require('../src/config/database');
 const app = require('../src/server');
 const seed = require('../database/seed');
-const { calcularIdade } = require('../src/services/dateService');
+const { calcularIdade, localParaISO } = require('../src/services/dateService');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const tz = require('dayjs/plugin/timezone');
@@ -62,6 +62,13 @@ test.after(async () => {
 test('idade e calculada dinamicamente (Thaina vira maior em 12/11/2026)', () => {
   assert.strictEqual(calcularIdade('2008-11-12', '2026-11-11'), 17);
   assert.strictEqual(calcularIdade('2008-11-12', '2026-11-12'), 18);
+});
+
+test('horario local rejeita datas e horarios impossiveis sem normaliza-los', () => {
+  for (const valor of ['2026-02-31T12:30', '2026-13-01T10:00', '2026-10-26T25:00', '2026-10-26T12:75', '2026-02-29T10:00']) {
+    assert.strictEqual(localParaISO(valor), null, `${valor} deveria ser rejeitado`);
+  }
+  assert.ok(localParaISO('2024-02-29T10:00'));
 });
 
 test('rotas exigem autenticacao e respeitam perfil', async () => {
@@ -132,6 +139,19 @@ test('entrada atrasada: log de horario alterado, sem notificar responsaveis e is
   assert.strictEqual(minhas.json.length, 1);
   const daniella = await entrarDemo('aluno', 'Daniella');
   assert.strictEqual((await req('GET', '/api/entradas', { cookie: daniella })).json.length, 0);
+});
+
+test('demo: gestor restaura os dados e continua logado; outros perfis nao podem', async () => {
+  const aluno = await entrarDemo('aluno');
+  assert.strictEqual((await req('POST', '/api/demo/reset', { cookie: aluno })).status, 403);
+  const gestor = await entrarDemo('gestor');
+  const r = await req('POST', '/api/demo/reset', { cookie: gestor });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.json.home, '/gestor');
+  const me = await req('GET', '/api/auth/me', { cookie: r.cookie });
+  assert.strictEqual(me.status, 200);
+  assert.strictEqual(me.json.usuario.role, 'gestor');
+  assert.strictEqual((await req('GET', '/api/saidas', { cookie: r.cookie })).json.length, 0);
 });
 
 test('gestor: CRUD de usuarios reflete imediatamente e auditoria e gravada', async () => {

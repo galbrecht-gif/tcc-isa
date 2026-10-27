@@ -7,6 +7,18 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [home, setHome] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState({ demoMode: false, googleEnabled: false });
+  const [demoUsuarios, setDemoUsuarios] = useState([]);
+
+  useEffect(() => {
+    api
+      .get('/auth/config')
+      .then(async ({ data }) => {
+        setConfig(data);
+        if (data.demoMode) setDemoUsuarios((await api.get('/auth/demo/usuarios')).data);
+      })
+      .catch(() => {});
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -46,7 +58,19 @@ export function AuthProvider({ children }) {
     setHome(null);
   }, []);
 
-  const value = useMemo(() => ({ user, home, loading, refresh, loginDemo, logout }), [user, home, loading, refresh, loginDemo, logout]);
+  const resetarDemo = useCallback(async () => {
+    const { data } = await api.post('/demo/reset');
+    const lista = await api.get('/auth/demo/usuarios');
+    setDemoUsuarios(lista.data);
+    setUser(data.usuario);
+    setHome(data.home);
+    return data.home;
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, home, loading, config, demoMode: config.demoMode, demoUsuarios, refresh, loginDemo, resetarDemo, logout }),
+    [user, home, loading, config, demoUsuarios, refresh, loginDemo, resetarDemo, logout]
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

@@ -10,6 +10,8 @@ export const fmtHora = (d) =>
 
 export const paraYMD = (iso) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(iso));
 
+export const ehHoje = (iso) => Boolean(iso) && paraYMD(iso) === paraYMD(new Date());
+
 // Valor para <input type="datetime-local"> no fuso America/Sao_Paulo.
 export function agoraInputLocal(offsetMinutos = 0) {
   const partes = new Intl.DateTimeFormat('en-CA', {

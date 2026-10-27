@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ShieldCheck, CheckCircle2, Car, XCircle, Mail } from 'lucide-react';
+import { CheckCircle2, Car, XCircle, Mail } from 'lucide-react';
 import api, { mensagemErro } from '../services/api';
+import Marca from '../components/Marca';
 import { useToast } from '../context/ToastContext';
 import { ConfirmModal } from '../components/Modal';
 import { fmtDataHora } from '../utils/format';
@@ -26,8 +27,16 @@ export default function ResponsavelValidar() {
   useEffect(() => {
     api
       .get('/demo/emails')
-      .then(({ data }) => setEmailsDemo(data))
+      .then(({ data }) => {
+        setEmailsDemo(data);
+        const alvo = params.get('protocolo');
+        const email = alvo && data.find((m) => new RegExp(`Protocolo: ${alvo}\\b`).test(m.corpo));
+        const cod = email && /Codigo de verificacao: (\d{6})/.exec(email.corpo)?.[1];
+        if (cod) setCodigo(cod);
+      })
       .catch(() => setEmailsDemo([]));
+    // preenchimento automatico apenas na abertura da tela
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const consultar = async (e) => {
@@ -66,7 +75,7 @@ export default function ResponsavelValidar() {
     <div className="publico-tela">
       <div className="publico-caixa">
         <div className="publico-marca">
-          <ShieldCheck size={32} /> <span>SENAI | Autorização do responsável</span>
+          <Marca subtitulo="Autorização do responsável" />
         </div>
 
         {concluido ? (

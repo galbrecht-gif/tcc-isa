@@ -43,6 +43,17 @@ exports.demoUsuarios = async (req, res) => {
   );
 };
 
+// Somente em modo demo: recria os dados de exemplo e mantem o gestor logado.
+exports.demoReset = async (req, res) => {
+  if (!env.demoMode) throw new HttpError(404, 'Modo demo desativado.');
+  const db = require('../config/database');
+  await require('../../database/seed')(db);
+  const [gestor] = await Usuario.listar({ role: 'gestor', ativo: 'true' });
+  res.cookie(COOKIE, assinarToken(gestor), opcoesCookie());
+  res.locals.audit = { acao: 'DEMO_RESET', usuarioId: gestor.id, depois: { ok: true } };
+  res.json({ usuario: gestor, home: HOME.gestor });
+};
+
 // Atalhos de desenvolvimento: usam um usuario real do banco; nunca existem em producao.
 exports.demoLogin = async (req, res) => {
   if (!env.demoMode) throw new HttpError(404, 'Modo demo desativado.');
