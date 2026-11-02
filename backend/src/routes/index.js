@@ -3,7 +3,8 @@ const rateLimit = require('express-rate-limit');
 const { passport, googleEnabled } = require('../config/passport');
 const env = require('../config/env');
 const { asyncHandler } = require('../middlewares/errorHandler');
-const { autenticar, exigirRole } = require('../middlewares/auth');
+const { PERFIS, autenticar, exigirRole } = require('../middlewares/auth');
+const db = require('../config/database');
 
 const wrap = (obj) => Object.fromEntries(Object.entries(obj).map(([k, fn]) => [k, asyncHandler(fn)]));
 
@@ -27,7 +28,13 @@ const limiteOtp = rateLimit({
 });
 const limiteLogin = rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: true, legacyHeaders: false });
 
-router.get('/health', (req, res) => res.json({ ok: true }));
+router.get(
+  '/health',
+  asyncHandler(async (req, res) => {
+    await db.raw('select 1');
+    res.json({ ok: true, database: 'connected' });
+  })
+);
 
 // Autenticacao
 router.get('/auth/config', auth.config);
@@ -36,7 +43,17 @@ router.get('/auth/demo/usuarios', auth.demoUsuarios);
 router.post('/auth/logout', auth.logout);
 router.get('/auth/me', autenticar, auth.me);
 if (googleEnabled) {
-  router.get('/auth/google', limiteLogin, passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+  router.get(
+    '/auth/google',
+    limiteLogin,
+    (req, res, next) => {
+      const perfil = String(req.query.perfil || '');
+      if (!PERFIS.includes(perfil)) return res.redirect(`${env.frontendUrl}/login?erro=perfil_invalido`);
+      res.cookie('perfil_login', perfil, { httpOnly: true, sameSite: 'lax', secure: env.isProduction, maxAge: 10 * 60 * 1000 });
+      next();
+    },
+    passport.authenticate('google', { scope: ['profile', 'email'], session: false })
+  );
   router.get(
     '/auth/google/callback',
     limiteLogin,

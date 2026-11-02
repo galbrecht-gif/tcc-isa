@@ -5,6 +5,15 @@ const Usuario = require('../models/usuarioModel');
 
 const googleEnabled = Boolean(env.google.clientId && env.google.clientSecret);
 
+function acessoTotal(email) {
+  return env.acessoTotalEmails.includes(String(email || '').trim().toLowerCase());
+}
+
+function emailInstitucionalPermitido(email) {
+  const match = /^([^\s@]+)@([^\s@]+)$/.exec(String(email || '').trim().toLowerCase());
+  return Boolean(match && env.senaiEmailDomains.includes(match[2]));
+}
+
 if (googleEnabled) {
   passport.use(
     new GoogleStrategy(
@@ -16,11 +25,13 @@ if (googleEnabled) {
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
-          const email = (profile.emails || []).find((e) => e.verified !== false);
-          if (!email) return done(null, false);
-          const usuario = await Usuario.buscarPorEmail(email.value);
-          if (!usuario || !usuario.ativo) return done(null, false);
-          return done(null, usuario);
+          // Aluno pode entrar com qualquer conta Google cadastrada; os demais perfis exigem e-mail SENAI.
+          for (const e of (profile.emails || []).filter((x) => x.verified !== false)) {
+            const usuario = await Usuario.buscarPorEmail(e.value);
+            if (!usuario || !usuario.ativo) continue;
+            if (usuario.role === 'aluno' || acessoTotal(e.value) || emailInstitucionalPermitido(e.value)) return done(null, usuario);
+          }
+          return done(null, false);
         } catch (err) {
           return done(err);
         }
@@ -29,4 +40,4 @@ if (googleEnabled) {
   );
 }
 
-module.exports = { passport, googleEnabled };
+module.exports = { passport, googleEnabled, emailInstitucionalPermitido, acessoTotal };

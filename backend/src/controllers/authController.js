@@ -1,9 +1,9 @@
 const env = require('../config/env');
-const { googleEnabled } = require('../config/passport');
+const { googleEnabled, acessoTotal } = require('../config/passport');
 const Usuario = require('../models/usuarioModel');
 const HttpError = require('../services/HttpError');
 const logService = require('../services/logService');
-const { assinarToken, opcoesCookie, COOKIE } = require('../middlewares/auth');
+const { PERFIS, assinarToken, opcoesCookie, COOKIE } = require('../middlewares/auth');
 
 const HOME = {
   aluno: '/aluno',
@@ -26,10 +26,16 @@ exports.logout = (req, res) => {
   res.json({ ok: true });
 };
 
-// Redireciona estritamente conforme a role cadastrada em "usuarios".
+// O perfil escolhido na tela de login precisa ser o cadastrado em "usuarios",
+// exceto contas de acesso total, que entram no perfil escolhido.
 exports.googleCallback = (req, res) => {
-  res.cookie(COOKIE, assinarToken(req.user), opcoesCookie());
-  logService.registrar({ idUsuario: req.user.id, acao: 'LOGIN_GOOGLE', depois: { email: req.user.email }, ip: req.ip });
+  const perfil = req.cookies.perfil_login;
+  res.clearCookie('perfil_login');
+  if (!PERFIS.includes(perfil)) return res.redirect(`${env.frontendUrl}/login?erro=perfil_invalido`);
+  const total = acessoTotal(req.user.email);
+  if (!total && req.user.role !== perfil) return res.redirect(`${env.frontendUrl}/login?erro=perfil_incorreto`);
+  res.cookie(COOKIE, assinarToken(req.user, total ? perfil : undefined), opcoesCookie());
+  logService.registrar({ idUsuario: req.user.id, acao: 'LOGIN_GOOGLE', depois: { email: req.user.email, perfil }, ip: req.ip });
   res.redirect(`${env.frontendUrl}/auth/callback`);
 };
 

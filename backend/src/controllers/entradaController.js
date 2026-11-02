@@ -51,7 +51,7 @@ exports.criar = async (req, res) => {
     assinatura,
     professor_ciente: false,
     criado_em: registro,
-  });
+  }).returning('id');
   const id = typeof ins === 'object' ? ins.id : ins;
 
   const destinatarios = [...(await notif.idsPorRole('gestor')), ...(await notif.idProfessorDaTurma(aluno.turma_id))];

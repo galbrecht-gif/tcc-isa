@@ -22,7 +22,7 @@ async function enviarOtpAosResponsaveis(saida, aluno, codigo) {
       assunto: `Autorizacao de saida antecipada - ${aluno.nome}`,
       corpo:
         `Ola, ${r.nome}.\n\n${aluno.nome} solicitou saida antecipada em ${formatarSP(saida.horario_previsto)}.\n` +
-        `Motivo: ${saida.motivo}\n\nProtocolo: ${saida.id}\nCodigo de verificacao: ${codigo} (valido por 15 minutos, uso unico)\n\n` +
+        `Motivo: ${saida.motivo}\n\nProtocolo: ${saida.id}\nCodigo de verificacao: ${codigo} (valido por 1 minuto, uso unico)\n\n` +
         `Acesse: ${env.frontendUrl}/responsavel/validar?protocolo=${saida.id}\n`,
     });
   }
@@ -75,7 +75,7 @@ exports.criar = async (req, res) => {
       assinatura: menor ? null : assinatura,
       criado_em: agora,
       atualizado_em: agora,
-    });
+    }).returning('id');
     const novoId = typeof ins === 'object' ? ins.id : ins;
     const cod = menor ? await otpService.gerar(novoId, trx) : null;
     return { id: novoId, codigo: cod };

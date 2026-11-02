@@ -12,6 +12,9 @@ const ALUNOS = [
 ];
 
 async function seed(db) {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DESTRUCTIVE_SEED !== 'true') {
+    throw new Error('Seed destrutivo bloqueado em producao. Configure ALLOW_DESTRUCTIVE_SEED=true somente se quiser apagar os dados.');
+  }
   const tabelas = ['logs_sistema', 'emails_log', 'notificacoes', 'otps_saida', 'saidas_antecipadas', 'entradas_atrasadas', 'aluno_responsavel', 'turmas', 'usuarios'];
   for (const t of tabelas) await db(t).del();
 

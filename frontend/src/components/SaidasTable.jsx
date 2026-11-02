@@ -16,6 +16,7 @@ export default function SaidasTable({ saidas, mostrarAluno = true, consolidado =
     { key: 'criado_em', label: 'Solicitada em', render: (s) => fmtDataHora(s.criado_em) },
     { key: 'horario_previsto', label: 'Saída prevista', render: (s) => fmtDataHora(s.horario_previsto) },
     { key: 'motivo', label: 'Motivo' },
+    { key: 'observacao_responsavel', label: 'Observação responsável', render: (s) => s.observacao_responsavel || '-' },
     consolidado
       ? {
           key: 'status_consolidado',

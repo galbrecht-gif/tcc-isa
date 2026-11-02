@@ -27,6 +27,7 @@ async function validar(body, idAtual) {
     dados.data_nascimento = body.data_nascimento;
     dados.turma_id = turma.id;
     const resp = Array.isArray(body.responsaveis) ? body.responsaveis : [];
+    if (resp.length > 3) throw new HttpError(400, 'O aluno pode ter no maximo 3 responsaveis.');
     const emails = new Set();
     dados.responsaveis = resp.map((r) => {
       const e = Usuario.normalizarEmail(r.email);

@@ -79,7 +79,7 @@ async function sincronizarResponsaveis(trx, alunoId, responsaveis = []) {
         ativo: true,
         criado_em: agora,
         atualizado_em: agora,
-      });
+      }).returning('id');
       existente = { id: typeof id === 'object' ? id.id : id };
     } else if (r.nome && r.nome.trim() !== existente.nome) {
       await trx('usuarios').where({ id: existente.id }).update({ nome: r.nome.trim(), atualizado_em: agora });
@@ -110,7 +110,7 @@ async function criar(dados) {
       turma_id: dados.role === 'aluno' ? dados.turma_id : null,
       criado_em: agora,
       atualizado_em: agora,
-    });
+    }).returning('id');
     const id = typeof ins === 'object' ? ins.id : ins;
     if (dados.role === 'aluno') await sincronizarResponsaveis(trx, id, dados.responsaveis);
     if (dados.role === 'professor') await sincronizarTurmasProfessor(trx, id, dados.turma_ids);

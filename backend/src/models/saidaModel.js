@@ -10,6 +10,7 @@ const COLUNAS = [
   's.status',
   's.responsavel_status',
   's.responsavel_decisao_em',
+  's.observacao_responsavel',
   's.gestor_status',
   's.gestor_justificativa',
   's.gestor_decisao_em',

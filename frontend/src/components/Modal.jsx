@@ -24,7 +24,7 @@ export default function Modal({ titulo, onClose, children, rodape, largo = false
   );
 }
 
-export function ConfirmModal({ titulo, mensagem, confirmar = 'Confirmar', perigo = false, carregando = false, onConfirm, onClose }) {
+export function ConfirmModal({ titulo, mensagem, confirmar = 'Confirmar', perigo = false, carregando = false, onConfirm, onClose, children }) {
   return (
     <Modal
       titulo={titulo}
@@ -41,6 +41,7 @@ export function ConfirmModal({ titulo, mensagem, confirmar = 'Confirmar', perigo
       }
     >
       <p>{mensagem}</p>
+      {children}
     </Modal>
   );
 }

@@ -28,6 +28,11 @@ exports.decidir = async (req, res) => {
   const id = Number(req.body.protocolo);
   const decisao = DECISOES[req.body.decisao];
   if (!decisao) throw new HttpError(400, 'Decisao invalida.');
+  const observacao = req.body.observacao === undefined ? '' : req.body.observacao;
+  if (typeof observacao !== 'string' || observacao.trim().length > 500) {
+    throw new HttpError(400, 'A observacao deve ter no maximo 500 caracteres.');
+  }
+  const observacaoResponsavel = decisao === 'AUTORIZADO' ? observacao.trim() || null : null;
   const s = Number.isInteger(id) ? await carregarSolicitacao(id) : null;
   if (!s || s.status !== 'AGUARDANDO_RESPONSAVEL') throw new HttpError(400, MSG_INVALIDO);
   const otp = await otpService.validar(id, req.body.codigo);
@@ -40,6 +45,7 @@ exports.decidir = async (req, res) => {
     const n = await trx('saidas_antecipadas').where({ id, status: 'AGUARDANDO_RESPONSAVEL' }).update({
       responsavel_status: decisao,
       responsavel_decisao_em: agora,
+      observacao_responsavel: observacaoResponsavel,
       status: recusado ? 'RECUSADO' : 'AGUARDANDO_GESTOR',
       atualizado_em: agora,
     });
@@ -50,17 +56,22 @@ exports.decidir = async (req, res) => {
   const rotulo = { AUTORIZADO: 'autorizou', IRA_BUSCAR: 'informou que ira buscar', NAO_AUTORIZADO: 'nao autorizou' }[decisao];
   await notif.notificar([s.aluno_id], {
     titulo: 'Resposta do responsavel',
-    mensagem: `O responsavel ${rotulo} sua saida antecipada.`,
+    mensagem: `O responsavel ${rotulo} sua saida antecipada.${observacaoResponsavel ? ` Observacao: ${observacaoResponsavel}` : ''}`,
     link: '/aluno',
   });
   if (!recusado) {
     await notif.notificar(await notif.idsPorRole('gestor'), {
       titulo: 'Saida antecipada aguardando aprovacao',
-      mensagem: `${s.aluno_nome}: responsavel ${rotulo}.`,
+      mensagem: `${s.aluno_nome}: responsavel ${rotulo}.${observacaoResponsavel ? ` Observacao: ${observacaoResponsavel}` : ''}`,
       link: '/gestor',
     });
   }
-  res.locals.audit = { acao: `SAIDA_RESPONSAVEL_${decisao}`, usuarioId: null, antes: { status: s.status }, depois: { protocolo: id, decisao } };
+  res.locals.audit = {
+    acao: `SAIDA_RESPONSAVEL_${decisao}`,
+    usuarioId: null,
+    antes: { status: s.status },
+    depois: { protocolo: id, decisao, observacao: observacaoResponsavel },
+  };
   res.json({ ok: true, decisao });
 };
 

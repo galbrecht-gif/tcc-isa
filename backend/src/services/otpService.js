@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const db = require('../config/database');
 const { agoraISO } = require('./dateService');
 
-const VALIDADE_MS = 15 * 60 * 1000;
+const VALIDADE_MS = 60 * 1000;
 const MAX_TENTATIVAS = 5;
 
 const hash = (codigo) => crypto.createHash('sha256').update(String(codigo)).digest('hex');
@@ -26,7 +26,7 @@ async function gerar(saidaId, trx = db) {
 async function validar(saidaId, codigo, trx = db) {
   const otp = await trx('otps_saida').where({ saida_id: saidaId, usado: false }).orderBy('id', 'desc').first();
   if (!otp) return null;
-  if (new Date(otp.expira_em).getTime() < Date.now() || otp.tentativas >= MAX_TENTATIVAS) return null;
+  if (new Date(otp.expira_em).getTime() <= Date.now() || otp.tentativas >= MAX_TENTATIVAS) return null;
   const informado = Buffer.from(hash(String(codigo || '')));
   const esperado = Buffer.from(otp.codigo_hash);
   if (!crypto.timingSafeEqual(informado, esperado)) {

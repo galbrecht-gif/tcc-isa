@@ -206,9 +206,16 @@ export default function GestorUsuarios() {
                       </button>
                     </div>
                   ))}
-                  <button type="button" className="btn btn-secundario btn-pequeno" onClick={() => setForm({ ...form, responsaveis: [...form.responsaveis, { nome: '', email: '' }] })}>
-                    <Plus size={14} /> Adicionar responsável
-                  </button>
+                  {form.responsaveis.length < 3 && (
+                    <button
+                      type="button"
+                      className="btn btn-secundario btn-pequeno"
+                      onClick={() => setForm({ ...form, responsaveis: [...form.responsaveis, { nome: '', email: '' }] })}
+                    >
+                      <Plus size={14} /> Adicionar responsável
+                    </button>
+                  )}
+                  <small className="texto-suave">É possível vincular até 3 responsáveis por aluno.</small>
                 </fieldset>
               </>
             )}

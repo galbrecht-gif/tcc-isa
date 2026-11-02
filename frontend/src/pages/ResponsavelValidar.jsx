@@ -18,6 +18,7 @@ export default function ResponsavelValidar() {
   const [params] = useSearchParams();
   const [protocolo, setProtocolo] = useState(params.get('protocolo') || '');
   const [codigo, setCodigo] = useState('');
+  const [observacao, setObservacao] = useState('');
   const [solicitacao, setSolicitacao] = useState(null);
   const [confirmar, setConfirmar] = useState(null);
   const [concluido, setConcluido] = useState(null);
@@ -55,7 +56,12 @@ export default function ResponsavelValidar() {
   const decidir = async () => {
     setEnviando(true);
     try {
-      await api.post('/public/responsavel/decidir', { protocolo: Number(protocolo), codigo, decisao: confirmar });
+      await api.post('/public/responsavel/decidir', {
+        protocolo: Number(protocolo),
+        codigo,
+        decisao: confirmar,
+        observacao: confirmar === 'AUTORIZO' ? observacao : undefined,
+      });
       setConcluido(confirmar);
       setConfirmar(null);
     } catch (err) {
@@ -89,7 +95,7 @@ export default function ResponsavelValidar() {
           </div>
         ) : !solicitacao ? (
           <form onSubmit={consultar} className="form">
-            <p className="texto-suave">Informe o protocolo e o código de 6 dígitos recebidos por e-mail (válido por 15 minutos).</p>
+            <p className="texto-suave">Informe o protocolo e o código de 6 dígitos recebidos por e-mail (válido por 1 minuto).</p>
             <label>
               Protocolo
               <input type="number" value={protocolo} onChange={(e) => setProtocolo(e.target.value)} required />
@@ -115,7 +121,14 @@ export default function ResponsavelValidar() {
             </dl>
             <div className="acoes-decisao">
               {Object.entries(DECISOES).map(([chave, d]) => (
-                <button key={chave} className={`btn ${d.classe}`} onClick={() => setConfirmar(chave)}>
+                <button
+                  key={chave}
+                  className={`btn ${d.classe}`}
+                  onClick={() => {
+                    setObservacao('');
+                    setConfirmar(chave);
+                  }}
+                >
                   <d.icone size={18} /> {d.rotulo}
                 </button>
               ))}
@@ -152,8 +165,24 @@ export default function ResponsavelValidar() {
           perigo={confirmar === 'NAO_AUTORIZO'}
           carregando={enviando}
           onConfirm={decidir}
-          onClose={() => setConfirmar(null)}
-        />
+          onClose={() => {
+            setConfirmar(null);
+            setObservacao('');
+          }}
+        >
+          {confirmar === 'AUTORIZO' && (
+            <label>
+              Observação (opcional)
+              <textarea
+                value={observacao}
+                onChange={(e) => setObservacao(e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="Ex.: irá de Uber, ônibus ou acompanhado por um parente."
+              />
+            </label>
+          )}
+        </ConfirmModal>
       )}
     </div>
   );

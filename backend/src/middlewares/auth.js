@@ -6,8 +6,13 @@ const { asyncHandler } = require('./errorHandler');
 
 const COOKIE = 'token';
 
-function assinarToken(usuario) {
-  return jwt.sign({ sub: usuario.id }, env.jwtSecret, { expiresIn: '8h' });
+const PERFIS = ['aluno', 'professor', 'gestor', 'portaria'];
+
+// "perfil" so e honrado para contas de acesso total (ACESSO_TOTAL_EMAILS).
+function assinarToken(usuario, perfil) {
+  const payload = { sub: usuario.id };
+  if (PERFIS.includes(perfil)) payload.perfil = perfil;
+  return jwt.sign(payload, env.jwtSecret, { expiresIn: '8h' });
 }
 
 function opcoesCookie() {
@@ -28,7 +33,8 @@ const autenticar = asyncHandler(async (req, res, next) => {
   }
   const usuario = await Usuario.buscarPorId(payload.sub);
   if (!usuario || !usuario.ativo) throw new HttpError(401, 'Conta inexistente ou desativada.');
-  req.user = usuario;
+  const total = env.acessoTotalEmails.includes(String(usuario.email).toLowerCase());
+  req.user = total && PERFIS.includes(payload.perfil) ? { ...usuario, role: payload.perfil } : usuario;
   next();
 });
 
@@ -37,4 +43,4 @@ const exigirRole =
   (req, res, next) =>
     roles.includes(req.user.role) ? next() : next(new HttpError(403, 'Acesso negado para este perfil.'));
 
-module.exports = { autenticar, exigirRole, assinarToken, opcoesCookie, COOKIE };
+module.exports = { PERFIS, autenticar, exigirRole, assinarToken, opcoesCookie, COOKIE };
