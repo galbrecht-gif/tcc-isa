@@ -50,6 +50,8 @@ router.post('/auth/senha/aluno/codigo', limiteSenhaAluno, auth.solicitarCodigoSe
 router.post('/auth/senha/aluno/definir', limiteSenhaAluno, auth.definirSenhaAluno);
 router.post('/auth/senha/aluno/cadastro/codigo', limiteCadastroAluno, auth.solicitarCodigoCadastroAluno);
 router.post('/auth/senha/aluno/cadastro/confirmar', limiteCadastroAluno, auth.confirmarCadastroAluno);
+router.get('/auth/google/cadastro-aluno', auth.dadosCadastroGoogleAluno);
+router.post('/auth/google/cadastro-aluno', limiteCadastroAluno, auth.confirmarCadastroGoogleAluno);
 router.get('/auth/me', autenticar, auth.me);
 if (googleEnabled) {
   router.get(

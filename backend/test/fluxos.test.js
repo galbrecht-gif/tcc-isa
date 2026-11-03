@@ -3,6 +3,7 @@ const assert = require('node:assert');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const jwt = require('jsonwebtoken');
 
 const dbFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tcc-')), 'test.sqlite');
 process.env.DB_FILENAME = dbFile;
@@ -14,6 +15,7 @@ process.env.NODE_ENV = 'test';
 const db = require('../src/config/database');
 const app = require('../src/server');
 const seed = require('../database/seed');
+const env = require('../src/config/env');
 const { calcularIdade, localParaISO } = require('../src/services/dateService');
 const { emailInstitucionalPermitido } = require('../src/config/passport');
 const otpService = require('../src/services/otpService');
@@ -82,6 +84,52 @@ test('login institucional aceita somente os dominios SENAI autorizados', () => {
   assert.strictEqual(emailInstitucionalPermitido('pessoa@senai.br'), false);
   assert.strictEqual(emailInstitucionalPermitido('pessoa@fake-sp.senai.br'), false);
   assert.strictEqual(emailInstitucionalPermitido('pessoa@gmail.com'), false);
+});
+
+test('cadastro de aluno pelo Google confirma o e-mail e exige os dados escolares', async () => {
+  const token = jwt.sign(
+    { tipo: 'cadastro_google_aluno', email: 'google.aluno@example.com', nome: 'Nome do Google' },
+    env.jwtSecret,
+    { expiresIn: '15m' }
+  );
+  const cookie = `cadastro_google=${token}`;
+  const dadosGoogle = await req('GET', '/api/auth/google/cadastro-aluno', { cookie });
+  assert.strictEqual(dadosGoogle.status, 200);
+  assert.deepStrictEqual(dadosGoogle.json, { nome: 'Nome do Google', email: 'google.aluno@example.com' });
+
+  const turmas = await req('GET', '/api/public/turmas');
+  const dadosCadastro = {
+    nome: 'Nome Confirmado',
+    email: 'email-forjado@example.com',
+    dataNascimento: '2000-01-01',
+    turmaId: turmas.json[0].id,
+  };
+  const criado = await req('POST', '/api/auth/google/cadastro-aluno', {
+    cookie,
+    body: dadosCadastro,
+  });
+  assert.strictEqual(criado.status, 201);
+
+  const usuario = await db('usuarios').where({ email: 'google.aluno@example.com' }).first();
+  assert.strictEqual(usuario.nome, 'Nome Confirmado');
+  assert.strictEqual(usuario.role, 'aluno');
+  assert.strictEqual(Boolean(usuario.ativo), true);
+  assert.strictEqual(usuario.senha_hash, null);
+  assert.strictEqual(usuario.turma_id, turmas.json[0].id);
+  assert.strictEqual((await req('POST', '/api/auth/google/cadastro-aluno', { cookie, body: dadosCadastro })).status, 409);
+  assert.strictEqual((await req('GET', '/api/auth/google/cadastro-aluno')).status, 401);
+
+  const tokenMenor = jwt.sign(
+    { tipo: 'cadastro_google_aluno', email: 'google.menor@example.com', nome: 'Aluno Menor' },
+    env.jwtSecret,
+    { expiresIn: '15m' }
+  );
+  const cadastroMenor = await req('POST', '/api/auth/google/cadastro-aluno', {
+    cookie: `cadastro_google=${tokenMenor}`,
+    body: { nome: 'Aluno Menor', dataNascimento: '2010-01-01', turmaId: turmas.json[0].id },
+  });
+  assert.strictEqual(cadastroMenor.status, 400);
+  assert.strictEqual(Boolean(await db('usuarios').where({ email: 'google.menor@example.com' }).first()), false);
 });
 
 test('codigo OTP tem validade de um minuto', () => {

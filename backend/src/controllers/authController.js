@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const env = require('../config/env');
 const { googleEnabled, acessoTotal } = require('../config/passport');
@@ -11,6 +12,8 @@ const { calcularIdade, hojeSP } = require('../services/dateService');
 const { PERFIS, assinarToken, opcoesCookie, COOKIE } = require('../middlewares/auth');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const GOOGLE_CADASTRO_COOKIE = 'cadastro_google';
+const GOOGLE_CADASTRO_TIPO = 'cadastro_google_aluno';
 const HOME = {
   aluno: '/aluno',
   professor: '/professor',
@@ -18,6 +21,48 @@ const HOME = {
   portaria: '/portaria',
   responsavel: '/responsavel',
 };
+
+async function validarDadosCadastroAluno(body, email = Usuario.normalizarEmail(body.email)) {
+  const nome = String(body.nome || '').trim();
+  const dataNascimento = String(body.dataNascimento || '');
+  const nascimento = /^\d{4}-\d{2}-\d{2}$/.test(dataNascimento) ? new Date(`${dataNascimento}T00:00:00.000Z`) : null;
+  const turmaId = Number(body.turmaId);
+  const responsavelNome = String(body.responsavelNome || '').trim();
+  const responsavelEmail = Usuario.normalizarEmail(body.responsavelEmail);
+  if (nome.length < 3 || nome.length > 150) throw new HttpError(400, 'Informe seu nome completo.');
+  if (email.length > 190 || !EMAIL_RE.test(email)) throw new HttpError(400, 'Informe um e-mail válido.');
+  if (!nascimento || Number.isNaN(nascimento.getTime()) || nascimento.toISOString().slice(0, 10) !== dataNascimento) {
+    throw new HttpError(400, 'Informe uma data de nascimento válida.');
+  }
+  if (dataNascimento > hojeSP()) throw new HttpError(400, 'A data de nascimento não pode estar no futuro.');
+  if (!Number.isInteger(turmaId) || turmaId < 1 || !(await db('turmas').where({ id: turmaId }).first())) {
+    throw new HttpError(400, 'Selecione uma turma válida.');
+  }
+  const menor = calcularIdade(dataNascimento) < 18;
+  if (menor) {
+    if (responsavelNome.length < 3 || responsavelNome.length > 150 || responsavelEmail.length > 190 || !EMAIL_RE.test(responsavelEmail)) {
+      throw new HttpError(400, 'Para menores de 18 anos, informe nome e e-mail de um responsável.');
+    }
+    if (responsavelEmail === email) throw new HttpError(400, 'O e-mail do responsável deve ser diferente do e-mail do aluno.');
+  }
+  return { nome, email, dataNascimento, turmaId, menor, responsavelNome, responsavelEmail };
+}
+
+function lerCadastroGoogle(req) {
+  try {
+    const payload = jwt.verify(req.cookies[GOOGLE_CADASTRO_COOKIE], env.jwtSecret);
+    if (
+      payload.tipo !== GOOGLE_CADASTRO_TIPO ||
+      typeof payload.email !== 'string' ||
+      typeof payload.nome !== 'string'
+    ) {
+      throw new Error('Token de cadastro Google inválido.');
+    }
+    return payload;
+  } catch {
+    throw new HttpError(401, 'A confirmação do Google expirou. Inicie o cadastro novamente.');
+  }
+}
 
 exports.config = (req, res) => {
   res.json({ demoMode: env.demoMode, googleEnabled });
@@ -75,30 +120,8 @@ exports.solicitarCodigoSenhaAluno = async (req, res) => {
 };
 
 exports.solicitarCodigoCadastroAluno = async (req, res) => {
-  const body = req.body || {};
-  const nome = String(body.nome || '').trim();
-  const email = Usuario.normalizarEmail(body.email);
-  const dataNascimento = String(body.dataNascimento || '');
-  const nascimento = /^\d{4}-\d{2}-\d{2}$/.test(dataNascimento) ? new Date(`${dataNascimento}T00:00:00.000Z`) : null;
-  const turmaId = Number(body.turmaId);
-  const responsavelNome = String(body.responsavelNome || '').trim();
-  const responsavelEmail = Usuario.normalizarEmail(body.responsavelEmail);
-  if (nome.length < 3 || nome.length > 150) throw new HttpError(400, 'Informe seu nome completo.');
-  if (email.length > 190 || !EMAIL_RE.test(email)) throw new HttpError(400, 'Informe um e-mail válido.');
-  if (!nascimento || Number.isNaN(nascimento.getTime()) || nascimento.toISOString().slice(0, 10) !== dataNascimento) {
-    throw new HttpError(400, 'Informe uma data de nascimento válida.');
-  }
-  if (dataNascimento > hojeSP()) throw new HttpError(400, 'A data de nascimento não pode estar no futuro.');
-  if (!Number.isInteger(turmaId) || turmaId < 1 || !(await db('turmas').where({ id: turmaId }).first())) {
-    throw new HttpError(400, 'Selecione uma turma válida.');
-  }
-  const menor = calcularIdade(dataNascimento) < 18;
-  if (menor) {
-    if (responsavelNome.length < 3 || responsavelNome.length > 150 || responsavelEmail.length > 190 || !EMAIL_RE.test(responsavelEmail)) {
-      throw new HttpError(400, 'Para menores de 18 anos, informe nome e e-mail de um responsável.');
-    }
-    if (responsavelEmail === email) throw new HttpError(400, 'O e-mail do responsável deve ser diferente do e-mail do aluno.');
-  }
+  const { nome, email, dataNascimento, turmaId, menor, responsavelNome, responsavelEmail } =
+    await validarDadosCadastroAluno(req.body || {});
 
   const mensagem = 'Se o e-mail puder ser usado, enviaremos um código para confirmar o cadastro.';
   if (await Usuario.buscarPorEmail(email)) {
@@ -137,6 +160,36 @@ exports.solicitarCodigoCadastroAluno = async (req, res) => {
     });
   }
   res.json({ mensagem });
+};
+
+exports.dadosCadastroGoogleAluno = (req, res) => {
+  const cadastro = lerCadastroGoogle(req);
+  res.json({ nome: cadastro.nome, email: cadastro.email });
+};
+
+exports.confirmarCadastroGoogleAluno = async (req, res) => {
+  const cadastroGoogle = lerCadastroGoogle(req);
+  const dados = await validarDadosCadastroAluno(req.body || {}, cadastroGoogle.email);
+  if (await Usuario.buscarPorEmail(dados.email)) {
+    res.clearCookie(GOOGLE_CADASTRO_COOKIE, { httpOnly: true, sameSite: 'lax', secure: env.isProduction });
+    throw new HttpError(409, 'Já existe uma conta com este e-mail. Entre pelo login.');
+  }
+  const id = await db.transaction((trx) =>
+    Usuario.criarEmTransacao(trx, {
+      nome: dados.nome,
+      email: dados.email,
+      role: 'aluno',
+      ativo: true,
+      data_nascimento: dados.dataNascimento,
+      turma_id: dados.turmaId,
+      responsaveis: dados.menor ? [{ nome: dados.responsavelNome, email: dados.responsavelEmail }] : [],
+    })
+  );
+  const usuario = await Usuario.buscarPorEmail(dados.email);
+  res.clearCookie(GOOGLE_CADASTRO_COOKIE, { httpOnly: true, sameSite: 'lax', secure: env.isProduction });
+  res.cookie(COOKIE, assinarToken(usuario), opcoesCookie());
+  logService.registrar({ idUsuario: id, acao: 'CADASTRO_ALUNO_GOOGLE', depois: { email: dados.email }, ip: req.ip });
+  res.status(201).json({ mensagem: 'Cadastro concluído.' });
 };
 
 exports.confirmarCadastroAluno = async (req, res) => {
@@ -240,6 +293,21 @@ exports.googleCallback = (req, res) => {
   const perfil = req.cookies.perfil_login;
   res.clearCookie('perfil_login');
   if (!PERFIS.includes(perfil)) return res.redirect(`${env.frontendUrl}/login?erro=perfil_invalido`);
+  if (req.user.cadastroGoogleAluno) {
+    if (perfil !== 'aluno') return res.redirect(`${env.frontendUrl}/login?erro=nao_autorizado`);
+    const token = jwt.sign(
+      { tipo: GOOGLE_CADASTRO_TIPO, email: req.user.email, nome: req.user.nome },
+      env.jwtSecret,
+      { expiresIn: '15m' }
+    );
+    res.cookie(GOOGLE_CADASTRO_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: env.isProduction,
+      maxAge: 15 * 60 * 1000,
+    });
+    return res.redirect(`${env.frontendUrl}/cadastro-aluno?google=1`);
+  }
   const total = acessoTotal(req.user.email);
   if (!total && req.user.role !== perfil) return res.redirect(`${env.frontendUrl}/login?erro=perfil_incorreto`);
   res.cookie(COOKIE, assinarToken(req.user, total ? perfil : undefined), opcoesCookie());

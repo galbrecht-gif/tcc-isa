@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api, { mensagemErro } from '../services/api';
 import Marca from '../components/Marca';
 
@@ -13,6 +13,9 @@ function menorDeIdade(dataNascimento) {
 }
 
 export default function CadastroAluno() {
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const googleCadastro = params.get('google') === '1';
   const [turmas, setTurmas] = useState([]);
   const [dados, setDados] = useState({
     nome: '',
@@ -28,6 +31,7 @@ export default function CadastroAluno() {
   const [codigoEnviado, setCodigoEnviado] = useState(false);
   const [concluido, setConcluido] = useState(false);
   const [erroTurmas, setErroTurmas] = useState(false);
+  const [carregandoGoogle, setCarregandoGoogle] = useState(googleCadastro);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -44,6 +48,16 @@ export default function CadastroAluno() {
       });
   }, []);
 
+  useEffect(() => {
+    if (!googleCadastro) return;
+    api.get('/auth/google/cadastro-aluno')
+      .then(({ data }) => {
+        setDados((atual) => ({ ...atual, nome: data.nome, email: data.email }));
+      })
+      .catch((err) => setErro(mensagemErro(err)))
+      .finally(() => setCarregandoGoogle(false));
+  }, [googleCadastro]);
+
   const atualizar = (campo, valor) => setDados((atual) => ({ ...atual, [campo]: valor }));
 
   const solicitarCodigo = async (e) => {
@@ -54,6 +68,20 @@ export default function CadastroAluno() {
       const { data } = await api.post('/auth/senha/aluno/cadastro/codigo', dados);
       setMensagem(`${data.mensagem} Confira também a caixa de spam. Se já tiver cadastro, use a opção de recuperar senha.`);
       setCodigoEnviado(true);
+    } catch (err) {
+      setErro(mensagemErro(err));
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const concluirCadastroGoogle = async (e) => {
+    e.preventDefault();
+    setErro('');
+    setEnviando(true);
+    try {
+      await api.post('/auth/google/cadastro-aluno', dados);
+      navigate('/auth/callback', { replace: true });
     } catch (err) {
       setErro(mensagemErro(err));
     } finally {
@@ -92,22 +120,26 @@ export default function CadastroAluno() {
         <div className="publico-marca">
           <Marca subtitulo="Cadastro de aluno" />
         </div>
-        <h1>{concluido ? 'Cadastro confirmado' : 'Crie sua conta de aluno'}</h1>
+        <h1>{concluido ? 'Cadastro confirmado' : googleCadastro ? 'Finalize seu cadastro de aluno' : 'Crie sua conta de aluno'}</h1>
         <p className="texto-suave">
-          Use qualquer e-mail válido que você consiga acessar. A conta será ativada depois da confirmação do endereço.
+          {googleCadastro
+            ? 'Confirme seus dados para concluir a criação da conta. Seu e-mail já foi confirmado pelo Google.'
+            : 'Use qualquer e-mail válido que você consiga acessar. A conta será ativada depois da confirmação do endereço.'}
         </p>
         {erro && <div className="alerta-erro" role="alert"><strong>{erro}</strong></div>}
         {mensagem && <p className="texto-ok" role="status">{mensagem}</p>}
 
-        {!codigoEnviado && !concluido && (
-          <form className="form" onSubmit={solicitarCodigo}>
+        {carregandoGoogle && <p className="texto-suave" role="status">Validando sua conta Google...</p>}
+
+        {!codigoEnviado && !concluido && !carregandoGoogle && (
+          <form className="form" onSubmit={googleCadastro ? concluirCadastroGoogle : solicitarCodigo}>
             <label>
               Nome completo
               <input autoComplete="name" minLength={3} maxLength={150} value={dados.nome} onChange={(e) => atualizar('nome', e.target.value)} required />
             </label>
             <label>
               E-mail
-              <input type="email" autoComplete="email" maxLength={190} value={dados.email} onChange={(e) => atualizar('email', e.target.value)} required />
+              <input type="email" autoComplete="email" maxLength={190} value={dados.email} onChange={(e) => atualizar('email', e.target.value)} required readOnly={googleCadastro} />
             </label>
             <label>
               Data de nascimento
@@ -143,7 +175,9 @@ export default function CadastroAluno() {
               </>
             )}
             <button className="btn btn-primario btn-grande" disabled={enviando || !turmas.length}>
-              {enviando ? 'Enviando código...' : 'Continuar e confirmar e-mail'}
+              {enviando
+                ? (googleCadastro ? 'Criando conta...' : 'Enviando código...')
+                : (googleCadastro ? 'Concluir cadastro com Google' : 'Continuar e confirmar e-mail')}
             </button>
           </form>
         )}
