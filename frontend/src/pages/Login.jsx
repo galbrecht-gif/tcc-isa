@@ -69,8 +69,11 @@ export default function Login() {
 
       <div className="login-caixa">
         <div className="login-conteudo">
-          <h2>Acesso ao sistema</h2>
-          <p className="texto-suave">Entre com seu e-mail e senha ou continue com sua conta Google.</p>
+          <header className="login-cabecalho">
+            <span className="login-etiqueta">Área de acesso</span>
+            <h2>Acesso ao sistema</h2>
+            <p className="texto-suave">Escolha como deseja entrar na sua conta.</p>
+          </header>
 
           {(erro || erroSenha) && (
             <div className="alerta-erro" role="alert">
@@ -81,41 +84,51 @@ export default function Login() {
             </div>
           )}
 
-          <form className="form" onSubmit={entrar}>
-            <label>
-              E-mail
-              <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </label>
-            <label>
-              Senha
-              <input type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
-            </label>
-            <button className="btn btn-primario btn-grande" disabled={enviando}>
-              {enviando ? 'Entrando...' : 'Entrar com e-mail e senha'}
-            </button>
-          </form>
+          <section className="login-secao" aria-labelledby="login-senha-titulo">
+            <h3 id="login-senha-titulo">E-mail e senha</h3>
+            <form className="form login-form" onSubmit={entrar}>
+              <label>
+                E-mail
+                <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </label>
+              <label>
+                Senha
+                <input type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
+              </label>
+              <button className="btn btn-primario btn-grande" disabled={enviando}>
+                {enviando ? 'Entrando...' : 'Entrar'}
+              </button>
+            </form>
+            <div className="login-links">
+              <Link className="link-btn" to="/cadastro-aluno">Criar conta de aluno</Link>
+              <Link className="link-btn" to="/senha-aluno">Esqueci minha senha</Link>
+            </div>
+          </section>
 
-          <Link className="link-btn centro" to="/cadastro-aluno">
-            Aluno: criar conta
-          </Link>
-          <Link className="link-btn centro" to="/senha-aluno">
-            Esqueci minha senha
-          </Link>
+          <section className="login-secao login-google" aria-labelledby="login-google-titulo">
+            <div className="login-secao-cabecalho">
+              <h3 id="login-google-titulo">Entrar com Google</h3>
+              <p className="texto-suave">Selecione seu perfil para continuar.</p>
+            </div>
+            <div className="demo-perfis">
+              {PERFIS.map(({ role, rotulo, desc, icone: Icone }) => (
+                <a key={role} className="perfil-card" href={`/api/auth/google?perfil=${role}`}>
+                  <Icone size={20} aria-hidden="true" />
+                  <span className="perfil-card-texto">
+                    <strong>{rotulo}</strong>
+                    <span>{desc}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+            {config.googleEnabled === false && <small className="login-google-aviso">Login Google não configurado neste ambiente.</small>}
+          </section>
 
-          <p className="texto-suave centro">Ou entre com Google:</p>
-          <div className="demo-perfis">
-            {PERFIS.map(({ role, rotulo, desc, icone: Icone }) => (
-              <a key={role} className="perfil-card" href={`/api/auth/google?perfil=${role}`}>
-                <Icone size={22} />
-                <strong>Entrar como {rotulo}</strong>
-                <span>{desc}</span>
-              </a>
-            ))}
+          <div className="login-responsavel">
+            <DoorOpen size={18} aria-hidden="true" />
+            <span>Recebeu um código de responsável?</span>
+            <Link to="/responsavel/validar">Validar código</Link>
           </div>
-          {config.googleEnabled === false && <small className="texto-suave">Google OAuth não configurado neste ambiente.</small>}
-          <Link className="link-btn centro" to="/responsavel/validar">
-            Sou responsável e recebi um código
-          </Link>
         </div>
       </div>
     </div>
