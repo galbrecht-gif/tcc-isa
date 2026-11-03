@@ -351,17 +351,19 @@ test('bootstrap cria o primeiro gestor institucional uma vez e recusa duplicacao
 
 test('conta de acesso total assume o perfil escolhido; as demais ficam na propria role', async () => {
   const { assinarToken } = require('../src/middlewares/auth');
-  const agora = new Date().toISOString();
-  const [id] = await db('usuarios').insert({ nome: 'Total', email: 'g.albrecht@aluno.senai.br', role: 'aluno', ativo: true, criado_em: agora, atualizado_em: agora }).returning('id').then((r) => r.map((x) => x.id || x));
-  const usuario = { id };
-  for (const perfil of ['gestor', 'professor', 'portaria']) {
-    const r = await req('GET', '/api/auth/me', { cookie: `token=${assinarToken(usuario, perfil)}` });
-    assert.strictEqual(r.json.usuario.role, perfil);
+  for (const email of ['g.albrecht@aluno.senai.br', 'leticia.m.cunha7@aluno.senai.br']) {
+    const agora = new Date().toISOString();
+    const [id] = await db('usuarios').insert({ nome: 'Total', email, role: 'aluno', ativo: true, criado_em: agora, atualizado_em: agora }).returning('id').then((r) => r.map((x) => x.id || x));
+    const usuario = { id };
+    for (const perfil of ['gestor', 'professor', 'portaria']) {
+      const r = await req('GET', '/api/auth/me', { cookie: `token=${assinarToken(usuario, perfil)}` });
+      assert.strictEqual(r.json.usuario.role, perfil);
+    }
+    await db('usuarios').where({ id }).del();
   }
   const normal = await db('usuarios').where({ role: 'professor' }).first();
   const r = await req('GET', '/api/auth/me', { cookie: `token=${assinarToken(normal, 'gestor')}` });
   assert.strictEqual(r.json.usuario.role, 'professor');
-  await db('usuarios').where({ id }).del();
 });
 
 test('equipe: senha temporaria obriga a troca antes de acessar o sistema', async () => {

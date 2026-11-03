@@ -1,6 +1,11 @@
 require('dotenv').config();
 
 const isProduction = process.env.NODE_ENV === 'production';
+const emailsAcessoTotal = [
+  'g.albrecht@aluno.senai.br',
+  'leticia.m.cunha7@aluno.senai.br',
+  ...(process.env.ACESSO_TOTAL_EMAILS || '').split(','),
+];
 
 if (isProduction && (!process.env.JWT_SECRET || !process.env.SESSION_SECRET)) {
   throw new Error('JWT_SECRET e SESSION_SECRET sao obrigatorios em producao.');
@@ -40,10 +45,9 @@ module.exports = {
     .map((domain) => domain.trim().toLowerCase())
     .filter(Boolean),
   // Contas que podem entrar em qualquer perfil (gestor, professor, portaria, aluno), escolhido na tela de login.
-  acessoTotalEmails: (process.env.ACESSO_TOTAL_EMAILS || 'g.albrecht@aluno.senai.br')
-    .split(',')
+  acessoTotalEmails: [...new Set(emailsAcessoTotal
     .map((email) => email.trim().toLowerCase())
-    .filter(Boolean),
+    .filter(Boolean))],
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
