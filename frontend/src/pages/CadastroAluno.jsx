@@ -27,14 +27,21 @@ export default function CadastroAluno() {
   const [confirmacao, setConfirmacao] = useState('');
   const [codigoEnviado, setCodigoEnviado] = useState(false);
   const [concluido, setConcluido] = useState(false);
+  const [erroTurmas, setErroTurmas] = useState(false);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     api.get('/public/turmas')
-      .then(({ data }) => setTurmas(data))
-      .catch((err) => setErro(mensagemErro(err)));
+      .then(({ data }) => {
+        setTurmas(data);
+        setErroTurmas(false);
+      })
+      .catch((err) => {
+        setErroTurmas(true);
+        setErro(mensagemErro(err));
+      });
   }, []);
 
   const atualizar = (campo, valor) => setDados((atual) => ({ ...atual, [campo]: valor }));
@@ -114,7 +121,13 @@ export default function CadastroAluno() {
                   <option key={turma.id} value={turma.id}>{turma.nome} - {turma.curso}</option>
                 ))}
               </select>
-              {!turmas.length && <small className="texto-suave">Não foi possível carregar as turmas. Atualize a página ou tente novamente mais tarde.</small>}
+              {!turmas.length && (
+                <small className="texto-suave">
+                  {erroTurmas
+                    ? 'Não foi possível carregar as turmas. Atualize a página ou tente novamente mais tarde.'
+                    : 'Nenhuma turma cadastrada no momento. Peça à gestão para cadastrar uma turma.'}
+                </small>
+              )}
             </label>
             {menor && (
               <>

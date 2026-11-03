@@ -19,10 +19,14 @@ export default function GestorUsuarios() {
   const [form, setForm] = useState(null);
   const [excluir, setExcluir] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [novaTurma, setNovaTurma] = useState({ nome: '', curso: '' });
+  const [enviandoTurma, setEnviandoTurma] = useState(false);
 
   useEffect(() => {
-    api.get('/turmas').then(({ data }) => setTurmas(data));
-  }, []);
+    api.get('/turmas')
+      .then(({ data }) => setTurmas(data))
+      .catch((err) => toast.erro(mensagemErro(err)));
+  }, [toast]);
 
   const novo = () => setForm({ ...VAZIO, turma_id: turmas[0]?.id || '' });
   const editar = (u) =>
@@ -51,6 +55,21 @@ export default function GestorUsuarios() {
       toast.erro(mensagemErro(err));
     } finally {
       setEnviando(false);
+    }
+  };
+
+  const criarTurma = async (e) => {
+    e.preventDefault();
+    setEnviandoTurma(true);
+    try {
+      const { data } = await api.post('/turmas', novaTurma);
+      setTurmas((atuais) => [...atuais, data].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+      setNovaTurma({ nome: '', curso: '' });
+      toast.sucesso('Turma criada. Ela já está disponível no cadastro de alunos.');
+    } catch (err) {
+      toast.erro(mensagemErro(err));
+    } finally {
+      setEnviandoTurma(false);
     }
   };
 
@@ -144,6 +163,40 @@ export default function GestorUsuarios() {
           </button>
         </div>
       </div>
+      <section className="cartao">
+        <h2>Criar turma</h2>
+        <p className="texto-suave">Cadastre as turmas reais para que os alunos possam selecioná-las ao criar a conta.</p>
+        <form className="form" onSubmit={criarTurma}>
+          <label>
+            Nome da turma
+            <input
+              value={novaTurma.nome}
+              onChange={(e) => setNovaTurma({ ...novaTurma, nome: e.target.value })}
+              minLength={2}
+              maxLength={100}
+              placeholder="Ex.: Desenvolvimento de Sistemas - 2º ano"
+              required
+            />
+          </label>
+          <label>
+            Curso
+            <input
+              value={novaTurma.curso}
+              onChange={(e) => setNovaTurma({ ...novaTurma, curso: e.target.value })}
+              minLength={2}
+              maxLength={150}
+              placeholder="Ex.: Desenvolvimento de Sistemas"
+              required
+            />
+          </label>
+          <div className="form-acoes">
+            <button className="btn btn-primario" disabled={enviandoTurma}>
+              <Plus size={16} /> {enviandoTurma ? 'Criando...' : 'Criar turma'}
+            </button>
+          </div>
+        </form>
+        {!turmas.length && <p className="texto-suave">Ainda não há turmas. Crie uma para liberar o cadastro dos alunos.</p>}
+      </section>
       <section className="cartao">
         <DataTable columns={columns} rows={usuarios.data || []} vazio="Nenhum usuário encontrado." />
       </section>

@@ -458,3 +458,18 @@ test('cadastro público: aluno confirma qualquer e-mail e ativa a própria conta
     mailService.enviar = enviarOriginal;
   }
 });
+
+test('turmas: somente gestor pode criar e novas turmas aparecem no cadastro público', async () => {
+  const aluno = await entrarDemo('aluno');
+  assert.strictEqual((await req('POST', '/api/turmas', { cookie: aluno, body: { nome: 'DEV 3', curso: 'Desenvolvimento' } })).status, 403);
+  const gestor = await entrarDemo('gestor');
+  const corpo = { nome: 'Turma Cadastro', curso: 'Curso Teste' };
+  const criada = await req('POST', '/api/turmas', { cookie: gestor, body: corpo });
+  assert.strictEqual(criada.status, 201);
+  assert.strictEqual(criada.json.nome, corpo.nome);
+  assert.strictEqual(criada.json.curso, corpo.curso);
+  const publicas = await req('GET', '/api/public/turmas');
+  assert.ok(publicas.json.some((turma) => turma.id === criada.json.id));
+  assert.strictEqual((await req('POST', '/api/turmas', { cookie: gestor, body: corpo })).status, 409);
+  assert.strictEqual((await req('POST', '/api/turmas', { cookie: gestor, body: { nome: '', curso: '' } })).status, 400);
+});

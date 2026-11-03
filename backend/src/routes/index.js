@@ -13,6 +13,7 @@ const saidas = wrap(require('../controllers/saidaController'));
 const entradas = wrap(require('../controllers/entradaController'));
 const usuarios = wrap(require('../controllers/usuarioController'));
 const alunos = wrap(require('../controllers/alunoController'));
+const turmas = wrap(require('../controllers/turmaController'));
 const notificacoes = wrap(require('../controllers/notificacaoController'));
 const logs = wrap(require('../controllers/logController'));
 const publico = wrap(require('../controllers/publicController'));
@@ -88,6 +89,7 @@ router.patch('/notificacoes/ler-todas', notificacoes.marcarTodasLidas);
 router.patch('/notificacoes/:id/ler', notificacoes.marcarLida);
 
 router.get('/turmas', exigirRole('gestor', 'portaria', 'professor'), alunos.turmas);
+router.post('/turmas', exigirRole('gestor'), turmas.criar);
 router.get('/alunos', exigirRole('gestor', 'portaria', 'professor'), alunos.buscar);
 
 router.get('/saidas', saidas.listar);
