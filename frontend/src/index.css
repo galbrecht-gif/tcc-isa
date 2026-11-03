@@ -118,6 +118,41 @@ button, input, select, textarea { font: inherit; }
 .pagina { padding: 28px; max-width: 1320px; width: 100%; margin: 0 auto; }
 .pagina-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .cartao { background: var(--branco); border-radius: var(--raio); border: 1px solid var(--cinza-borda); box-shadow: var(--sombra); padding: 20px; margin-bottom: 22px; }
+.cursos-criar { padding: 22px; }
+.cursos-secao-titulo, .curso-card-identidade { display: flex; align-items: center; gap: 12px; }
+.cursos-secao-titulo { margin-bottom: 18px; }
+.cursos-secao-titulo h2, .curso-card-identidade h2 { margin: 0 0 4px; font-size: 1.05rem; }
+.cursos-secao-titulo p, .curso-card-identidade p { margin: 0; }
+.cursos-icone { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 12px; background: var(--vermelho-claro); color: var(--vermelho); }
+.cursos-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: end; }
+.cursos-form .form-acoes { grid-column: 1 / -1; }
+.cursos-resumo { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 16px; }
+.cursos-resumo-item { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--cinza-borda); border-radius: 10px; background: var(--branco); color: var(--cinza-texto); font-size: 0.88rem; }
+.cursos-resumo-item svg { color: var(--vermelho); }
+.cursos-resumo-item strong { color: var(--grafite); }
+.cursos-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 16px; }
+.cursos-lista > .cartao { margin: 0; }
+.cursos-vazio { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--cinza-texto); text-align: center; }
+.cursos-vazio svg { color: var(--vermelho); }
+.curso-card { display: flex; flex-direction: column; gap: 18px; }
+.curso-card-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.curso-contagem { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 6px 9px; border-radius: 999px; background: #dce8fb; color: var(--azul); font-size: 0.78rem; font-weight: 700; }
+.curso-professor { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 0.88rem; }
+.curso-professor select { width: 100%; padding: 10px 12px; border: 1px solid var(--cinza-borda); border-radius: 10px; background: var(--branco); font-weight: 400; }
+.turma-alunos { border-top: 1px solid var(--cinza); padding-top: 12px; }
+.turma-alunos-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 0; border: 0; background: transparent; color: var(--grafite); cursor: pointer; font-weight: 700; text-align: left; }
+.turma-alunos-toggle span { display: flex; align-items: center; gap: 8px; }
+.turma-alunos-toggle svg { color: var(--vermelho); }
+.turma-alunos-lista { padding: 6px 0 0 24px; color: var(--cinza-texto); font-size: 0.88rem; }
+.turma-alunos-lista ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 7px 16px; margin: 8px 0 0; padding: 0; list-style: none; }
+.turma-alunos-lista li { padding: 7px 9px; border-radius: 8px; background: var(--cinza); color: var(--grafite); }
+.turma-alunos-lista p { margin: 8px 0; }
+.texto-erro { color: var(--vermelho-escuro); }
+.professor-turmas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; margin-top: 14px; }
+.professor-turma { padding: 15px; border: 1px solid var(--cinza-borda); border-radius: 12px; }
+.professor-turma > div:first-child { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.professor-turma > div:first-child strong { font-size: 1rem; }
+.professor-turma > div:first-child span, .professor-turma > div:first-child small { color: var(--cinza-texto); }
 
 /* Indicadores */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 22px; }
@@ -310,6 +345,8 @@ legend { font-weight: 700; padding: 0 6px; }
   .usuario-info { display: none; }
   .demo-topo select { max-width: 130px; }
   .linha-resp { grid-template-columns: 1fr; }
+  .cursos-form { grid-template-columns: 1fr; }
+  .cursos-form .form-acoes { grid-column: auto; }
   .demo-aluno { grid-template-columns: 1fr; }
   .sino-painel { position: fixed; left: 10px; right: 10px; width: auto; top: 70px; }
 }

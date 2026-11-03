@@ -8,6 +8,7 @@ import {
   DoorOpen,
   History,
   UserCog,
+  BookOpen,
   ScrollText,
   LayoutDashboard,
   LogIn,
@@ -36,6 +37,7 @@ const NAV = {
   gestor: [
     { to: '/gestor', label: 'Solicitações de saída', icon: ClipboardList, end: true },
     { to: '/gestor/entradas', label: 'Entradas atrasadas', icon: History },
+    { to: '/gestor/cursos', label: 'Cursos', icon: BookOpen },
     { to: '/gestor/usuarios', label: 'Gerenciar Usuários', icon: UserCog },
     { to: '/gestor/logs', label: 'Auditoria', icon: ScrollText },
   ],

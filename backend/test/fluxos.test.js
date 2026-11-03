@@ -523,3 +523,59 @@ test('turmas: somente gestor pode criar e novas turmas aparecem no cadastro púb
   assert.strictEqual((await req('POST', '/api/turmas', { cookie: gestor, body: corpo })).status, 409);
   assert.strictEqual((await req('POST', '/api/turmas', { cookie: gestor, body: { nome: '', curso: '' } })).status, 400);
 });
+
+test('cursos: gestor acompanha inscritos e professor ve somente as turmas vinculadas', async () => {
+  const gestor = await entrarDemo('gestor');
+  const professor = await entrarDemo('professor');
+  const professorLogado = await req('GET', '/api/auth/me', { cookie: professor });
+  const Usuario = require('../src/models/usuarioModel');
+  const outroProfessorId = await Usuario.criar({
+    nome: 'Professor sem turma',
+    email: `professor.sem.turma.${Date.now()}@sp.senai.br`,
+    role: 'professor',
+    ativo: true,
+    turma_ids: [],
+  });
+  const tokenOutroProfessor = require('../src/middlewares/auth').assinarToken({ id: outroProfessorId });
+  const nomeTurma = `Turma Cursos ${Date.now()}`;
+  const criada = await req('POST', '/api/turmas', { cookie: gestor, body: { nome: nomeTurma, curso: 'Curso com Inscritos' } });
+  assert.strictEqual(criada.status, 201);
+
+  const semProfessor = await req('PATCH', `/api/turmas/${criada.json.id}/professor`, {
+    cookie: professor,
+    body: { professor_id: professorLogado.json.usuario.id },
+  });
+  assert.strictEqual(semProfessor.status, 403);
+
+  const vinculada = await req('PATCH', `/api/turmas/${criada.json.id}/professor`, {
+    cookie: gestor,
+    body: { professor_id: professorLogado.json.usuario.id },
+  });
+  assert.strictEqual(vinculada.status, 200);
+
+  const alunoId = await require('../src/models/usuarioModel').criar({
+    nome: 'Aluno da Turma Registrado',
+    email: `aluno.curso.${Date.now()}@gmail.com`,
+    role: 'aluno',
+    ativo: true,
+    data_nascimento: '2005-01-01',
+    turma_id: criada.json.id,
+    responsaveis: [],
+  });
+  try {
+    const cursosGestor = await req('GET', '/api/turmas', { cookie: gestor });
+    const turmaGestor = cursosGestor.json.find((turma) => turma.id === criada.json.id);
+    assert.strictEqual(turmaGestor.professor_id, professorLogado.json.usuario.id);
+    assert.strictEqual(turmaGestor.professor_nome, professorLogado.json.usuario.nome);
+    assert.strictEqual(turmaGestor.alunos_count, 1);
+
+    const cursosProfessor = await req('GET', '/api/turmas', { cookie: professor });
+    assert.ok(cursosProfessor.json.some((turma) => turma.id === criada.json.id));
+    const alunos = await req('GET', `/api/turmas/${criada.json.id}/alunos`, { cookie: professor });
+    assert.deepStrictEqual(alunos.json.map((aluno) => aluno.nome), ['Aluno da Turma Registrado']);
+    assert.strictEqual((await req('GET', `/api/turmas/${criada.json.id}/alunos`, { cookie: `token=${tokenOutroProfessor}` })).status, 403);
+  } finally {
+    await db('usuarios').where({ id: alunoId }).del();
+    await db('usuarios').where({ id: outroProfessorId }).del();
+  }
+});

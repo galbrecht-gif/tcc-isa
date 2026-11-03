@@ -90,8 +90,10 @@ router.get('/notificacoes', notificacoes.listar);
 router.patch('/notificacoes/ler-todas', notificacoes.marcarTodasLidas);
 router.patch('/notificacoes/:id/ler', notificacoes.marcarLida);
 
-router.get('/turmas', exigirRole('gestor', 'portaria', 'professor'), alunos.turmas);
+router.get('/turmas', exigirRole('gestor', 'portaria', 'professor'), turmas.listar);
+router.get('/turmas/:id/alunos', exigirRole('gestor', 'professor'), turmas.alunos);
 router.post('/turmas', exigirRole('gestor'), turmas.criar);
+router.patch('/turmas/:id/professor', exigirRole('gestor'), turmas.definirProfessor);
 router.get('/alunos', exigirRole('gestor', 'portaria', 'professor'), alunos.buscar);
 
 router.get('/saidas', saidas.listar);

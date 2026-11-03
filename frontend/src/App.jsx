@@ -17,6 +17,7 @@ import PortariaHistorico from './pages/PortariaHistorico';
 import GestorSolicitacoes from './pages/GestorSolicitacoes';
 import GestorEntradas from './pages/GestorEntradas';
 import GestorUsuarios from './pages/GestorUsuarios';
+import GestorCursos from './pages/GestorCursos';
 import GestorLogs from './pages/GestorLogs';
 import ResponsavelPainel from './pages/ResponsavelPainel';
 
@@ -54,6 +55,7 @@ export default function App() {
           <Route element={<ProtectedRoute roles={['gestor']} />}>
             <Route path="/gestor" element={<GestorSolicitacoes />} />
             <Route path="/gestor/entradas" element={<GestorEntradas />} />
+            <Route path="/gestor/cursos" element={<GestorCursos />} />
             <Route path="/gestor/usuarios" element={<GestorUsuarios />} />
             <Route path="/gestor/logs" element={<GestorLogs />} />
           </Route>

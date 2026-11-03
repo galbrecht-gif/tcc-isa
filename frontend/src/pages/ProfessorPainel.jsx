@@ -5,11 +5,13 @@ import useApi from '../components/useApi';
 import SaidasTable from '../components/SaidasTable';
 import EntradasTable from '../components/EntradasTable';
 import StatCards from '../components/StatCards';
+import TurmaAlunos from '../components/TurmaAlunos';
 
 export default function ProfessorPainel() {
   const toast = useToast();
   const saidas = useApi('/saidas');
   const entradas = useApi('/entradas');
+  const turmas = useApi('/turmas');
 
   const saidasPendentes = (saidas.data || []).filter((s) => s.gestor_status === 'APROVADO' && !s.professor_ciente).length;
   const entradasPendentes = (entradas.data || []).filter((e) => !e.professor_ciente).length;
@@ -36,6 +38,22 @@ export default function ProfessorPainel() {
           { icone: ClipboardCheck, rotulo: 'Registros com ciência', valor: cientes, tom: 'verde' },
         ]}
       />
+      <section className="cartao">
+        <h2>Meus cursos e turmas</h2>
+        {!turmas.data?.length && <p className="texto-suave">Nenhuma turma vinculada ao seu perfil. Peça à gestão para associar seus cursos.</p>}
+        <div className="professor-turmas">
+          {(turmas.data || []).map((turma) => (
+            <article className="professor-turma" key={turma.id}>
+              <div>
+                <strong>{turma.curso}</strong>
+                <span>{turma.nome}</span>
+                <small>{turma.alunos_count} {turma.alunos_count === 1 ? 'aluno inscrito' : 'alunos inscritos'}</small>
+              </div>
+              <TurmaAlunos turma={turma} />
+            </article>
+          ))}
+        </div>
+      </section>
       <section className="cartao">
         <h2>Saídas antecipadas</h2>
         <SaidasTable
