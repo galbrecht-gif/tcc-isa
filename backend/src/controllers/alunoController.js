@@ -22,3 +22,7 @@ exports.buscar = async (req, res) => {
 exports.turmas = async (req, res) => {
   res.json(await db('turmas').select('id', 'nome', 'curso').orderBy('nome'));
 };
+
+exports.turmasPublicas = async (req, res) => {
+  res.json(await db('turmas').select('id', 'nome', 'curso').orderBy('nome'));
+};

@@ -3,13 +3,15 @@ const { agoraISO, calcularIdade } = require('../services/dateService');
 
 const ROLES = ['aluno', 'professor', 'gestor', 'portaria', 'responsavel'];
 
-const COLUNAS = ['id', 'nome', 'email', 'role', 'ativo', 'data_nascimento', 'turma_id', 'criado_em'];
+const COLUNAS = ['id', 'nome', 'email', 'role', 'ativo', 'deve_trocar_senha', 'data_nascimento', 'turma_id', 'criado_em'];
 
 const normalizarEmail = (email) => String(email || '').trim().toLowerCase();
 
 function publico(u) {
   if (!u) return null;
   const out = { ...u, ativo: Boolean(u.ativo) };
+  out.deve_trocar_senha = Boolean(u.deve_trocar_senha);
+  delete out.senha_hash;
   if (u.role === 'aluno' && u.data_nascimento) {
     out.idade = calcularIdade(u.data_nascimento);
     out.maior_idade = out.idade >= 18;
@@ -98,32 +100,43 @@ async function sincronizarTurmasProfessor(trx, professorId, turmaIds = []) {
   if (turmaIds.length) await trx('turmas').whereIn('id', turmaIds).update({ professor_id: professorId });
 }
 
-async function criar(dados) {
-  return db.transaction(async (trx) => {
-    const agora = agoraISO();
-    const [ins] = await trx('usuarios').insert({
-      nome: dados.nome,
-      email: dados.email,
-      role: dados.role,
-      ativo: dados.ativo !== false,
-      data_nascimento: dados.role === 'aluno' ? dados.data_nascimento : null,
-      turma_id: dados.role === 'aluno' ? dados.turma_id : null,
-      criado_em: agora,
-      atualizado_em: agora,
-    }).returning('id');
-    const id = typeof ins === 'object' ? ins.id : ins;
-    if (dados.role === 'aluno') await sincronizarResponsaveis(trx, id, dados.responsaveis);
-    if (dados.role === 'professor') await sincronizarTurmasProfessor(trx, id, dados.turma_ids);
-    return id;
-  });
+async function criarEmTransacao(trx, dados) {
+  const agora = agoraISO();
+  const [ins] = await trx('usuarios').insert({
+    nome: dados.nome,
+    email: dados.email,
+    role: dados.role,
+    ativo: dados.ativo !== false,
+    senha_hash: dados.senhaHash || null,
+    deve_trocar_senha: Boolean(dados.senhaHash) && ['professor', 'gestor', 'portaria'].includes(dados.role),
+    data_nascimento: dados.role === 'aluno' ? dados.data_nascimento : null,
+    turma_id: dados.role === 'aluno' ? dados.turma_id : null,
+    criado_em: agora,
+    atualizado_em: agora,
+  }).returning('id');
+  const id = typeof ins === 'object' ? ins.id : ins;
+  if (dados.role === 'aluno') await sincronizarResponsaveis(trx, id, dados.responsaveis);
+  if (dados.role === 'professor') await sincronizarTurmasProfessor(trx, id, dados.turma_ids);
+  return id;
 }
+
+const criar = (dados) => db.transaction((trx) => criarEmTransacao(trx, dados));
 
 async function atualizar(id, dados) {
   return db.transaction(async (trx) => {
+    const atual = await trx('usuarios').where({ id }).first();
     const patch = { atualizado_em: agoraISO() };
     ['nome', 'email', 'role', 'ativo'].forEach((c) => {
       if (dados[c] !== undefined) patch[c] = dados[c];
     });
+    if (dados.senhaHash) {
+      patch.senha_hash = dados.senhaHash;
+      patch.deve_trocar_senha = true;
+    }
+    if (dados.role !== atual.role && ['aluno', 'responsavel'].includes(dados.role)) {
+      patch.senha_hash = null;
+      patch.deve_trocar_senha = false;
+    }
     patch.data_nascimento = dados.role === 'aluno' ? dados.data_nascimento : null;
     patch.turma_id = dados.role === 'aluno' ? dados.turma_id : null;
     await trx('usuarios').where({ id }).update(patch);
@@ -133,6 +146,9 @@ async function atualizar(id, dados) {
     else await trx('turmas').where({ professor_id: id }).update({ professor_id: null });
   });
 }
+
+const definirSenha = (id, senhaHash) =>
+  db('usuarios').where({ id }).update({ senha_hash: senhaHash, deve_trocar_senha: false, atualizado_em: agoraISO() });
 
 const definirAtivo = (id, ativo) => db('usuarios').where({ id }).update({ ativo, atualizado_em: agoraISO() });
 
@@ -145,6 +161,8 @@ module.exports = {
   listar,
   detalhar,
   criar,
+  criarEmTransacao,
   atualizar,
+  definirSenha,
   definirAtivo,
 };

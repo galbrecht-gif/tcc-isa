@@ -27,6 +27,9 @@ const limiteOtp = rateLimit({
   message: { erro: 'Muitas tentativas. Aguarde alguns minutos.' },
 });
 const limiteLogin = rateLimit({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: true, legacyHeaders: false });
+const limiteSenhaLogin = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
+const limiteSenhaAluno = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
+const limiteCadastroAluno = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 
 router.get(
   '/health',
@@ -41,6 +44,11 @@ router.get('/auth/config', auth.config);
 router.post('/auth/demo', limiteLogin, auth.demoLogin);
 router.get('/auth/demo/usuarios', auth.demoUsuarios);
 router.post('/auth/logout', auth.logout);
+router.post('/auth/senha/login', limiteSenhaLogin, auth.entrarComSenha);
+router.post('/auth/senha/aluno/codigo', limiteSenhaAluno, auth.solicitarCodigoSenhaAluno);
+router.post('/auth/senha/aluno/definir', limiteSenhaAluno, auth.definirSenhaAluno);
+router.post('/auth/senha/aluno/cadastro/codigo', limiteCadastroAluno, auth.solicitarCodigoCadastroAluno);
+router.post('/auth/senha/aluno/cadastro/confirmar', limiteCadastroAluno, auth.confirmarCadastroAluno);
 router.get('/auth/me', autenticar, auth.me);
 if (googleEnabled) {
   router.get(
@@ -67,10 +75,13 @@ if (googleEnabled) {
 // Rotas publicas do responsavel (validadas por OTP)
 router.post('/public/responsavel/consultar', limiteOtp, publico.consultar);
 router.post('/public/responsavel/decidir', limiteOtp, publico.decidir);
+router.get('/public/turmas', asyncHandler(alunos.turmasPublicas));
 router.get('/demo/emails', publico.emailsDemo);
 
 // Rotas protegidas
 router.use(autenticar);
+
+router.post('/auth/senha/alterar', auth.alterarSenha);
 
 router.get('/notificacoes', notificacoes.listar);
 router.patch('/notificacoes/ler-todas', notificacoes.marcarTodasLidas);

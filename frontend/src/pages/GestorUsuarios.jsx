@@ -8,7 +8,7 @@ import DataTable from '../components/DataTable';
 import Modal, { ConfirmModal } from '../components/Modal';
 import { ROLES } from '../utils/format';
 
-const VAZIO = { nome: '', email: '', role: 'aluno', ativo: true, data_nascimento: '', turma_id: '', responsaveis: [], turma_ids: [] };
+const VAZIO = { nome: '', email: '', role: 'aluno', roleOriginal: null, senhaTemporaria: '', ativo: true, data_nascimento: '', turma_id: '', responsaveis: [], turma_ids: [] };
 
 export default function GestorUsuarios() {
   const toast = useToast();
@@ -29,6 +29,8 @@ export default function GestorUsuarios() {
     setForm({
       ...VAZIO,
       ...u,
+      roleOriginal: u.role,
+      senhaTemporaria: '',
       data_nascimento: u.data_nascimento || '',
       turma_id: u.turma_id || '',
       responsaveis: (u.responsaveis || []).map(({ nome, email }) => ({ nome, email })),
@@ -154,7 +156,7 @@ export default function GestorUsuarios() {
               <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required minLength={3} />
             </label>
             <label>
-              E-mail (Google)
+              E-mail
               <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
             </label>
             <label>
@@ -172,6 +174,22 @@ export default function GestorUsuarios() {
               <input type="checkbox" checked={form.ativo} onChange={(e) => setForm({ ...form, ativo: e.target.checked })} disabled={form.id === user.id} />
               Conta ativa
             </label>
+
+            {['professor', 'gestor', 'portaria'].includes(form.role) && (
+              <label>
+                Senha temporária {form.id && '(deixe em branco para manter a senha atual)'}
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={128}
+                  value={form.senhaTemporaria}
+                  onChange={(e) => setForm({ ...form, senhaTemporaria: e.target.value })}
+                  required={!form.id || form.roleOriginal !== form.role}
+                />
+                <small className="texto-suave">O usuário deverá criar uma senha pessoal no primeiro acesso.</small>
+              </label>
+            )}
 
             {form.role === 'aluno' && (
               <>

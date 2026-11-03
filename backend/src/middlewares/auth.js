@@ -33,6 +33,13 @@ const autenticar = asyncHandler(async (req, res, next) => {
   }
   const usuario = await Usuario.buscarPorId(payload.sub);
   if (!usuario || !usuario.ativo) throw new HttpError(401, 'Conta inexistente ou desativada.');
+  if (
+    usuario.deve_trocar_senha &&
+    !(req.method === 'GET' && req.path === '/auth/me') &&
+    !(req.method === 'POST' && req.path === '/auth/senha/alterar')
+  ) {
+    throw new HttpError(403, 'Troque sua senha temporaria antes de continuar.');
+  }
   const total = env.acessoTotalEmails.includes(String(usuario.email).toLowerCase());
   req.user = total && PERFIS.includes(payload.perfil) ? { ...usuario, role: payload.perfil } : usuario;
   next();

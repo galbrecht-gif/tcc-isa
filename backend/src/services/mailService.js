@@ -3,8 +3,8 @@ const { transporter, smtpConfigurado, from } = require('../config/mailer');
 const env = require('../config/env');
 const { agoraISO } = require('./dateService');
 
-// Sempre registra o e-mail no banco; envia via SMTP quando configurado, senao imprime no console (modo demo).
-async function enviar({ para, assunto, corpo }) {
+// Registra e-mails operacionais; códigos de autenticação podem ser enviados sem persistir o conteúdo.
+async function enviar({ para, assunto, corpo, registrarLog = true }) {
   let modo = 'DEMO';
   if (smtpConfigurado) {
     try {
@@ -20,7 +20,9 @@ async function enviar({ para, assunto, corpo }) {
   if (modo === 'DEMO') {
     console.log(`\n[EMAIL DEMO] Para: ${para}\nAssunto: ${assunto}\n${corpo}\n`);
   }
-  await db('emails_log').insert({ destinatario: para, assunto, corpo, modo, criado_em: agoraISO() });
+  if (registrarLog) {
+    await db('emails_log').insert({ destinatario: para, assunto, corpo, modo, criado_em: agoraISO() });
+  }
   return modo;
 }
 

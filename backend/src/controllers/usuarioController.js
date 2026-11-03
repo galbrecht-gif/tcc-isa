@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const Usuario = require('../models/usuarioModel');
 const HttpError = require('../services/HttpError');
+const { hashSenha, validarSenha } = require('../services/passwordService');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -16,7 +17,22 @@ async function validar(body, idAtual) {
   const dup = await Usuario.buscarPorEmail(email);
   if (dup && dup.id !== idAtual) throw new HttpError(409, 'Ja existe um usuario com este e-mail.');
 
+  const funcionario = ['professor', 'gestor', 'portaria'].includes(role);
+  const atual = idAtual ? await Usuario.buscarPorId(idAtual) : null;
+  const exigeSenhaTemporaria = funcionario && (!atual || atual.role !== role);
   const dados = { nome, email, role, ativo: body.ativo !== false };
+  if (funcionario && body.senhaTemporaria) {
+    try {
+      validarSenha(body.senhaTemporaria);
+    } catch (err) {
+      throw new HttpError(err.status, err.message);
+    }
+    dados.senhaHash = await hashSenha(body.senhaTemporaria);
+  } else if (exigeSenhaTemporaria) {
+    throw new HttpError(400, 'Defina uma senha temporaria com pelo menos 8 caracteres.');
+  } else if (body.senhaTemporaria) {
+    throw new HttpError(400, 'Senha temporaria so pode ser definida para Professor, Gestor ou Portaria.');
+  }
   if (role === 'aluno') {
     if (!DATA_RE.test(body.data_nascimento || '') || Number.isNaN(Date.parse(body.data_nascimento))) {
       throw new HttpError(400, 'Data de nascimento invalida.');

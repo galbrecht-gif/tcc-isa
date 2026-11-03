@@ -3,6 +3,9 @@ import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import SenhaAluno from './pages/SenhaAluno';
+import CadastroAluno from './pages/CadastroAluno';
+import AlterarSenha from './pages/AlterarSenha';
 import AuthCallback from './pages/AuthCallback';
 import ResponsavelValidar from './pages/ResponsavelValidar';
 import AlunoSolicitacoes from './pages/AlunoSolicitacoes';
@@ -28,6 +31,9 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Raiz />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/senha-aluno" element={<SenhaAluno />} />
+      <Route path="/cadastro-aluno" element={<CadastroAluno />} />
+      <Route path="/alterar-senha" element={<ProtectedRoute passwordChangeOnly><AlterarSenha /></ProtectedRoute>} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/responsavel/validar" element={<ResponsavelValidar />} />
 

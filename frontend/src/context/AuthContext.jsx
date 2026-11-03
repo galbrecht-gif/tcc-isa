@@ -52,6 +52,13 @@ export function AuthProvider({ children }) {
     return data.home;
   }, []);
 
+  const loginComSenha = useCallback(async (email, senha) => {
+    const { data } = await api.post('/auth/senha/login', { email, senha });
+    setUser(data.usuario);
+    setHome(data.home);
+    return data;
+  }, []);
+
   const logout = useCallback(async () => {
     await api.post('/auth/logout');
     setUser(null);
@@ -68,8 +75,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, home, loading, config, demoMode: config.demoMode, demoUsuarios, refresh, loginDemo, resetarDemo, logout }),
-    [user, home, loading, config, demoUsuarios, refresh, loginDemo, resetarDemo, logout]
+    () => ({ user, home, loading, config, demoMode: config.demoMode, demoUsuarios, refresh, loginDemo, loginComSenha, resetarDemo, logout }),
+    [user, home, loading, config, demoUsuarios, refresh, loginDemo, loginComSenha, resetarDemo, logout]
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
