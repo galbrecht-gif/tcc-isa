@@ -4,7 +4,7 @@ exports.up = async function up(knex) {
   if (!(await knex.schema.hasColumn('usuarios', 'deve_trocar_senha'))) alteracoes.push('deve_trocar_senha');
   if (alteracoes.length) {
     await knex.schema.alterTable('usuarios', (t) => {
-      if (alteracoes.includes('senha_hash')) t.string('senha_hash', 160).nullable();
+      if (alteracoes.includes('senha_hash')) t.string('senha_hash', 255).nullable();
       if (alteracoes.includes('deve_trocar_senha')) t.boolean('deve_trocar_senha').notNullable().defaultTo(false);
     });
   }
