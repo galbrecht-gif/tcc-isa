@@ -1,11 +1,6 @@
 require('dotenv').config();
 
 const isProduction = process.env.NODE_ENV === 'production';
-const emailsAcessoTotal = [
-  'g.albrecht@aluno.senai.br',
-  'leticia.m.cunha7@aluno.senai.br',
-  ...(process.env.ACESSO_TOTAL_EMAILS || '').split(','),
-];
 
 if (isProduction && (!process.env.JWT_SECRET || !process.env.SESSION_SECRET)) {
   throw new Error('JWT_SECRET e SESSION_SECRET sao obrigatorios em producao.');
@@ -40,14 +35,6 @@ module.exports = {
   // Em producao o modo demo exige opt-in explicito (DEMO_PUBLICO=true), para hospedagem de demonstracao.
   demoMode: process.env.DEMO_MODE === 'true' && (!isProduction || process.env.DEMO_PUBLICO === 'true'),
   timezone: process.env.TZ_APP || 'America/Sao_Paulo',
-  senaiEmailDomains: (process.env.SENAI_EMAIL_DOMAINS || 'sp.senai.br,dp.senai.br')
-    .split(',')
-    .map((domain) => domain.trim().toLowerCase())
-    .filter(Boolean),
-  // Contas que podem entrar em qualquer perfil (gestor, professor, portaria, aluno), escolhido na tela de login.
-  acessoTotalEmails: [...new Set(emailsAcessoTotal
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean))],
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,

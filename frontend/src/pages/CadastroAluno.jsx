@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import api, { mensagemErro } from '../services/api';
 import Marca from '../components/Marca';
 
 function menorDeIdade(dataNascimento) {
   if (!dataNascimento) return false;
   const [ano, mes, dia] = dataNascimento.split('-').map(Number);
-  const hoje = new Date();
-  let idade = hoje.getFullYear() - ano;
-  if (hoje.getMonth() + 1 < mes || (hoje.getMonth() + 1 === mes && hoje.getDate() < dia)) idade -= 1;
+  const hojePartes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const hoje = Object.fromEntries(hojePartes.map(({ type, value }) => [type, value]));
+  let idade = Number(hoje.year) - ano;
+  if (Number(hoje.month) < mes || (Number(hoje.month) === mes && Number(hoje.day) < dia)) idade -= 1;
   return idade < 18;
 }
 
@@ -25,10 +32,8 @@ export default function CadastroAluno() {
     responsavelNome: '',
     responsavelEmail: '',
   });
-  const [codigo, setCodigo] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmacao, setConfirmacao] = useState('');
-  const [codigoEnviado, setCodigoEnviado] = useState(false);
   const [concluido, setConcluido] = useState(false);
   const [erroTurmas, setErroTurmas] = useState(false);
   const [carregandoGoogle, setCarregandoGoogle] = useState(googleCadastro);
@@ -60,14 +65,19 @@ export default function CadastroAluno() {
 
   const atualizar = (campo, valor) => setDados((atual) => ({ ...atual, [campo]: valor }));
 
-  const solicitarCodigo = async (e) => {
+  const criarConta = async (e) => {
     e.preventDefault();
     setErro('');
+    setMensagem('');
+    if (senha !== confirmacao) {
+      setErro('As senhas não conferem.');
+      return;
+    }
     setEnviando(true);
     try {
-      const { data } = await api.post('/auth/senha/aluno/cadastro/codigo', dados);
-      setMensagem(`${data.mensagem} Confira também a caixa de spam. Se já tiver cadastro, use a opção de recuperar senha.`);
-      setCodigoEnviado(true);
+      const { data } = await api.post('/auth/senha/aluno/cadastro', { ...dados, senha });
+      setMensagem(data.mensagem);
+      setConcluido(true);
     } catch (err) {
       setErro(mensagemErro(err));
     } finally {
@@ -89,50 +99,28 @@ export default function CadastroAluno() {
     }
   };
 
-  const confirmarCadastro = async (e) => {
-    e.preventDefault();
-    setErro('');
-    if (senha !== confirmacao) {
-      setErro('As senhas não conferem.');
-      return;
-    }
-    setEnviando(true);
-    try {
-      const { data } = await api.post('/auth/senha/aluno/cadastro/confirmar', {
-        email: dados.email,
-        codigo,
-        senha,
-      });
-      setMensagem(data.mensagem);
-      setConcluido(true);
-    } catch (err) {
-      setErro(mensagemErro(err));
-    } finally {
-      setEnviando(false);
-    }
-  };
-
   const menor = menorDeIdade(dados.dataNascimento);
 
   return (
     <main className="publico-tela">
       <section className="publico-caixa">
+        <Link className="link-btn" to="/login" aria-label="Voltar para o login">
+          <ArrowLeft size={18} aria-hidden="true" /> Voltar ao login
+        </Link>
         <div className="publico-marca">
           <Marca subtitulo="Cadastro de aluno" />
         </div>
-        <h1>{concluido ? 'Cadastro confirmado' : googleCadastro ? 'Finalize seu cadastro de aluno' : 'Crie sua conta de aluno'}</h1>
-        <p className="texto-suave">
-          {googleCadastro
-            ? 'Confirme seus dados para concluir a criação da conta. Seu e-mail já foi confirmado pelo Google.'
-            : 'Use qualquer e-mail válido que você consiga acessar. A conta será ativada depois da confirmação do endereço.'}
-        </p>
+        <h1>{concluido ? 'Conta criada' : googleCadastro ? 'Finalize seu cadastro de aluno' : 'Crie sua conta de aluno'}</h1>
+        {googleCadastro && (
+          <p className="texto-suave">Confirme seus dados para concluir a criação da conta. Seu e-mail já foi confirmado pelo Google.</p>
+        )}
         {erro && <div className="alerta-erro" role="alert"><strong>{erro}</strong></div>}
         {mensagem && <p className="texto-ok" role="status">{mensagem}</p>}
 
         {carregandoGoogle && <p className="texto-suave" role="status">Validando sua conta Google...</p>}
 
-        {!codigoEnviado && !concluido && !carregandoGoogle && (
-          <form className="form" onSubmit={googleCadastro ? concluirCadastroGoogle : solicitarCodigo}>
+        {!concluido && !carregandoGoogle && (
+          <form className="form" onSubmit={googleCadastro ? concluirCadastroGoogle : criarConta}>
             <label>
               Nome completo
               <input autoComplete="name" minLength={3} maxLength={150} value={dados.nome} onChange={(e) => atualizar('nome', e.target.value)} required />
@@ -145,6 +133,13 @@ export default function CadastroAluno() {
               Data de nascimento
               <input type="date" value={dados.dataNascimento} onChange={(e) => atualizar('dataNascimento', e.target.value)} required />
             </label>
+            {dados.dataNascimento && (
+              <p className="texto-suave" role="status">
+                {menor
+                  ? 'Identificação automática: menor de 18 anos. É necessário cadastrar um responsável.'
+                  : 'Identificação automática: maior de idade. Não é necessário cadastrar um responsável.'}
+              </p>
+            )}
             <label>
               Turma
               <select value={dados.turmaId} onChange={(e) => atualizar('turmaId', e.target.value)} required disabled={!turmas.length}>
@@ -174,38 +169,22 @@ export default function CadastroAluno() {
                 <small className="texto-suave">Como você tem menos de 18 anos, o responsável será vinculado para autorizar solicitações de saída.</small>
               </>
             )}
+            {!googleCadastro && (
+              <>
+                <label>
+                  Crie sua senha
+                  <input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={senha} onChange={(e) => setSenha(e.target.value)} required />
+                </label>
+                <label>
+                  Confirme sua senha
+                  <input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={confirmacao} onChange={(e) => setConfirmacao(e.target.value)} required />
+                </label>
+              </>
+            )}
             <button className="btn btn-primario btn-grande" disabled={enviando || !turmas.length}>
               {enviando
-                ? (googleCadastro ? 'Criando conta...' : 'Enviando código...')
-                : (googleCadastro ? 'Concluir cadastro com Google' : 'Continuar e confirmar e-mail')}
-            </button>
-          </form>
-        )}
-
-        {codigoEnviado && !concluido && (
-          <form className="form" onSubmit={confirmarCadastro}>
-            <label>
-              Código enviado para {dados.email}
-              <input
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Crie sua senha
-              <input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={senha} onChange={(e) => setSenha(e.target.value)} required />
-            </label>
-            <label>
-              Confirme sua senha
-              <input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={confirmacao} onChange={(e) => setConfirmacao(e.target.value)} required />
-            </label>
-            <button className="btn btn-primario btn-grande" disabled={enviando}>
-              {enviando ? 'Confirmando...' : 'Confirmar cadastro'}
+                ? 'Criando conta...'
+                : (googleCadastro ? 'Concluir cadastro com Google' : 'Criar conta de aluno')}
             </button>
           </form>
         )}

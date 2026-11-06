@@ -9,6 +9,7 @@ const dbFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tcc-')), 'test.s
 process.env.DB_FILENAME = dbFile;
 process.env.DB_CLIENT = 'better-sqlite3';
 process.env.DATABASE_URL = '';
+process.env.SMTP_HOST = '';
 process.env.DEMO_MODE = 'true';
 process.env.NODE_ENV = 'test';
 
@@ -17,9 +18,10 @@ const app = require('../src/server');
 const seed = require('../database/seed');
 const env = require('../src/config/env');
 const { calcularIdade, localParaISO } = require('../src/services/dateService');
-const { emailInstitucionalPermitido } = require('../src/config/passport');
+const { emailPermitidoParaPerfil, perfisPermitidos } = require('../src/config/equipePermitida');
 const otpService = require('../src/services/otpService');
 const criarGestorInicial = require('../scripts/criar-gestor-inicial');
+const definirSenhaEquipe = require('../scripts/definir-senha-equipe');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const tz = require('dayjs/plugin/timezone');
@@ -78,12 +80,19 @@ test('horario local rejeita datas e horarios impossiveis sem normaliza-los', () 
   assert.ok(localParaISO('2024-02-29T10:00'));
 });
 
-test('login institucional aceita somente os dominios SENAI autorizados', () => {
-  assert.strictEqual(emailInstitucionalPermitido('Pessoa@SP.SENAI.BR'), true);
-  assert.strictEqual(emailInstitucionalPermitido('pessoa@dp.senai.br'), true);
-  assert.strictEqual(emailInstitucionalPermitido('pessoa@senai.br'), false);
-  assert.strictEqual(emailInstitucionalPermitido('pessoa@fake-sp.senai.br'), false);
-  assert.strictEqual(emailInstitucionalPermitido('pessoa@gmail.com'), false);
+test('perfis de equipe aceitam somente e-mails explicitamente autorizados', () => {
+  assert.deepStrictEqual(perfisPermitidos(' LMENEZES@SP.SENAI.BR '), ['gestor', 'portaria']);
+  assert.strictEqual(emailPermitidoParaPerfil('edilson.ferreira@sp.senai.br', 'professor'), true);
+  assert.strictEqual(emailPermitidoParaPerfil('edilson.ferreira@sp.senai.br', 'gestor'), false);
+  assert.strictEqual(emailPermitidoParaPerfil('pessoa@sp.senai.br', 'gestor'), false);
+  assert.strictEqual(emailPermitidoParaPerfil('pessoa@gmail.com', 'professor'), false);
+  for (const email of [
+    'g.albrecht@aluno.senai.br',
+    'isabelly.d.rosa@aluno.senai.br',
+    'leticia.m.cunha7@aluno.senai.br',
+  ]) {
+    assert.deepStrictEqual(perfisPermitidos(email), ['aluno', 'professor', 'gestor', 'portaria']);
+  }
 });
 
 test('cadastro de aluno pelo Google confirma o e-mail e exige os dados escolares', async () => {
@@ -332,44 +341,135 @@ test('bootstrap cria o primeiro gestor institucional uma vez e recusa duplicacao
   await db('usuarios').where({ role: 'gestor' }).del();
   const nomeAnterior = process.env.GESTOR_NOME;
   const emailAnterior = process.env.GESTOR_EMAIL;
+  const senhaAnterior = process.env.GESTOR_SENHA_TEMPORARIA;
   process.env.GESTOR_NOME = 'Gestor Inicial';
-  process.env.GESTOR_EMAIL = 'gestor.inicial@sp.senai.br';
+  process.env.GESTOR_EMAIL = 'lmenezes@sp.senai.br';
+  process.env.GESTOR_SENHA_TEMPORARIA = 'Temporaria-123';
   try {
     const id = await criarGestorInicial();
     const gestor = await db('usuarios').where({ id }).first();
     assert.strictEqual(gestor.nome, 'Gestor Inicial');
-    assert.strictEqual(gestor.email, 'gestor.inicial@sp.senai.br');
+    assert.strictEqual(gestor.email, 'lmenezes@sp.senai.br');
     assert.strictEqual(gestor.role, 'gestor');
+    assert.strictEqual(Boolean(gestor.deve_trocar_senha), true);
     await assert.rejects(criarGestorInicial(), /Ja existe um gestor cadastrado/);
+    const login = await req('POST', '/api/auth/senha/login', {
+      body: { email: gestor.email, senha: 'Temporaria-123' },
+    });
+    assert.strictEqual(login.status, 200);
+    assert.strictEqual((await req('POST', '/api/auth/senha/alterar', {
+      cookie: login.cookie,
+      body: { senhaAtual: 'Temporaria-123', novaSenha: 'Senha-Gestor-456' },
+    })).status, 200);
   } finally {
     if (nomeAnterior === undefined) delete process.env.GESTOR_NOME;
     else process.env.GESTOR_NOME = nomeAnterior;
     if (emailAnterior === undefined) delete process.env.GESTOR_EMAIL;
     else process.env.GESTOR_EMAIL = emailAnterior;
+    if (senhaAnterior === undefined) delete process.env.GESTOR_SENHA_TEMPORARIA;
+    else process.env.GESTOR_SENHA_TEMPORARIA = senhaAnterior;
   }
 });
 
-test('conta de acesso total assume o perfil escolhido; as demais ficam na propria role', async () => {
-  const { assinarToken } = require('../src/middlewares/auth');
-  for (const email of ['g.albrecht@aluno.senai.br', 'leticia.m.cunha7@aluno.senai.br']) {
-    const agora = new Date().toISOString();
-    const [id] = await db('usuarios').insert({ nome: 'Total', email, role: 'aluno', ativo: true, criado_em: agora, atualizado_em: agora }).returning('id').then((r) => r.map((x) => x.id || x));
-    const usuario = { id };
-    for (const perfil of ['gestor', 'professor', 'portaria']) {
-      const r = await req('GET', '/api/auth/me', { cookie: `token=${assinarToken(usuario, perfil)}` });
-      assert.strictEqual(r.json.usuario.role, perfil);
+test('gestor autorizado pode escolher Gestor ou Portaria, mas nao outro perfil', async () => {
+  const gestor = await db('usuarios').where({ email: 'lmenezes@sp.senai.br', role: 'gestor' }).first();
+  const senha = 'Senha-Gestor-456';
+  const portaria = await req('POST', '/api/auth/senha/login', {
+    body: { email: gestor.email, senha, perfil: 'portaria' },
+  });
+  assert.strictEqual(portaria.status, 200);
+  assert.strictEqual(portaria.json.usuario.role, 'portaria');
+  assert.strictEqual((await req('GET', '/api/auth/me', { cookie: portaria.cookie })).json.usuario.role, 'portaria');
+  const invalido = await req('POST', '/api/auth/senha/login', {
+    body: { email: gestor.email, senha, perfil: 'professor' },
+  });
+  assert.strictEqual(invalido.status, 401);
+});
+
+test('contas autorizadas para acesso completo podem entrar pelos atalhos de cada perfil', async () => {
+  const turma = (await req('GET', '/api/public/turmas')).json[0];
+  const emails = [
+    'g.albrecht@aluno.senai.br',
+    'isabelly.d.rosa@aluno.senai.br',
+    'leticia.m.cunha7@aluno.senai.br',
+  ];
+  const senha = 'Acesso-Completo-123';
+  const usuariosNovos = [];
+  const usuariosExistentes = [];
+  try {
+    for (const [indice, email] of emails.entries()) {
+      const senhaHash = await require('../src/services/passwordService').hashSenha(senha);
+      const existente = await db('usuarios').where({ email }).first();
+      if (existente) {
+        usuariosExistentes.push(existente);
+        await db('usuarios').where({ id: existente.id }).update({
+          role: 'aluno',
+          ativo: true,
+          senha_hash: senhaHash,
+          deve_trocar_senha: false,
+        });
+      } else {
+        const id = await require('../src/models/usuarioModel').criar({
+          nome: 'Conta de acesso completo',
+          email,
+          role: 'aluno',
+          ativo: true,
+          senhaHash,
+          data_nascimento: '2000-01-01',
+          turma_id: turma.id,
+          responsaveis: [],
+        });
+        usuariosNovos.push(id);
+      }
+
+      const perfilAtalho = ['gestor', 'professor', 'portaria'][indice];
+      let loginJson;
+      let loginCookie;
+      await require('../src/controllers/authController').entrarComSenha(
+        { body: { email, senha, perfil: perfilAtalho }, ip: '127.0.0.1' },
+        {
+          cookie: (nome, valor) => { if (nome === 'token') loginCookie = valor; },
+          json: (dados) => { loginJson = dados; },
+        }
+      );
+      assert.strictEqual(loginJson.usuario.role, perfilAtalho);
+      assert.strictEqual((await req('GET', '/api/auth/me', { cookie: `token=${loginCookie}` })).json.usuario.role, perfilAtalho);
+
+      const { assinarToken } = require('../src/middlewares/auth');
+      for (const perfil of ['aluno', 'gestor', 'professor', 'portaria']) {
+        const token = assinarToken({ id: loginJson.usuario.id }, perfil);
+        const me = await req('GET', '/api/auth/me', { cookie: `token=${token}` });
+        assert.strictEqual(me.status, 200, `${email} deve poder usar o atalho ${perfil}`);
+        assert.strictEqual(me.json.usuario.role, perfil);
+      }
+
+      let googleCookie;
+      let googleRedirect;
+      require('../src/controllers/authController').googleCallback(
+        { cookies: { perfil_login: perfilAtalho }, user: { id: loginJson.usuario.id, email, role: 'aluno' }, ip: '127.0.0.1' },
+        {
+          clearCookie: () => {},
+          cookie: (nome, valor) => { if (nome === 'token') googleCookie = valor; },
+          redirect: (destino) => { googleRedirect = destino; },
+        }
+      );
+      assert.strictEqual(googleRedirect.endsWith('/auth/callback'), true);
+      assert.strictEqual((await req('GET', '/api/auth/me', { cookie: `token=${googleCookie}` })).json.usuario.role, perfilAtalho);
     }
-    await db('usuarios').where({ id }).del();
+
+  } finally {
+    if (usuariosNovos.length) await db('usuarios').whereIn('id', usuariosNovos).del();
+    for (const usuario of usuariosExistentes) {
+      const { id, ...dados } = usuario;
+      await db('usuarios').where({ id }).update(dados);
+    }
   }
-  const normal = await db('usuarios').where({ role: 'professor' }).first();
-  const r = await req('GET', '/api/auth/me', { cookie: `token=${assinarToken(normal, 'gestor')}` });
-  assert.strictEqual(r.json.usuario.role, 'professor');
 });
 
 test('equipe: senha temporaria obriga a troca antes de acessar o sistema', async () => {
   const gestor = await entrarDemo('gestor');
   const senhaTemporaria = 'Temporaria-123';
-  const email = `prof.senha.${Date.now()}@sp.senai.br`;
+  const email = 'edilson.ferreira@sp.senai.br';
   const criado = await req('POST', '/api/usuarios', {
     cookie: gestor,
     body: { nome: 'Professor Senha', email, role: 'professor', ativo: true, senhaTemporaria, turma_ids: [] },
@@ -377,7 +477,6 @@ test('equipe: senha temporaria obriga a troca antes de acessar o sistema', async
   assert.strictEqual(criado.status, 201);
   assert.strictEqual(criado.json.deve_trocar_senha, true);
   assert.strictEqual(criado.json.senha_hash, undefined);
-
   const login = await req('POST', '/api/auth/senha/login', { body: { email, senha: senhaTemporaria } });
   assert.strictEqual(login.status, 200);
   assert.strictEqual(login.json.usuario.deve_trocar_senha, true);
@@ -396,6 +495,38 @@ test('equipe: senha temporaria obriga a troca antes de acessar o sistema', async
 
   const logs = await db('logs_sistema').where({ acao: 'POST /api/auth/senha/login' }).orderBy('timestamp', 'desc');
   assert.ok(logs.every((log) => !String(log.dados_novos).includes(senhaTemporaria)));
+});
+
+test('gestor pode cadastrar professor com novo e-mail e primeiro login exige senha pessoal', async () => {
+  const gestor = await entrarDemo('gestor');
+  const email = `professor.novo.${Date.now()}@exemplo.com`;
+  const senhaTemporaria = 'Senai@123';
+  const criado = await req('POST', '/api/usuarios', {
+    cookie: gestor,
+    body: { nome: 'Professor Novo', email, role: 'professor', ativo: true, senhaTemporaria, turma_ids: [] },
+  });
+  assert.strictEqual(criado.status, 201);
+  assert.strictEqual(criado.json.role, 'professor');
+  assert.strictEqual(criado.json.deve_trocar_senha, true);
+
+  const login = await req('POST', '/api/auth/senha/login', { body: { email, senha: senhaTemporaria } });
+  assert.strictEqual(login.status, 200);
+  assert.strictEqual(login.json.usuario.role, 'professor');
+  assert.strictEqual(login.json.usuario.deve_trocar_senha, true);
+  assert.strictEqual((await req('GET', '/api/turmas', { cookie: login.cookie })).status, 403);
+
+  const troca = await req('POST', '/api/auth/senha/alterar', {
+    cookie: login.cookie,
+    body: { senhaAtual: senhaTemporaria, novaSenha: 'Professor-Pessoal-456' },
+  });
+  assert.strictEqual(troca.status, 200);
+  assert.strictEqual((await req('GET', '/api/auth/me', { cookie: login.cookie })).json.usuario.deve_trocar_senha, false);
+  assert.strictEqual((await req('POST', '/api/auth/senha/login', {
+    body: { email, senha: 'Professor-Pessoal-456' },
+  })).json.usuario.role, 'professor');
+  assert.strictEqual((await req('POST', '/api/auth/senha/login', {
+    body: { email, senha: 'Professor-Pessoal-456', perfil: 'gestor' },
+  })).status, 401);
 });
 
 test('aluno: código de uso único cria senha sem persistir o código em texto puro', async () => {
@@ -442,7 +573,7 @@ test('aluno: código de uso único cria senha sem persistir o código em texto p
   }
 });
 
-test('cadastro público: aluno confirma qualquer e-mail e ativa a própria conta', async () => {
+test('cadastro público: cria aluno com senha sem depender de confirmação por e-mail', async () => {
   const turma = (await req('GET', '/api/public/turmas')).json[0];
   assert.ok(turma);
   const email = `cadastro.${Date.now()}@gmail.com`;
@@ -455,58 +586,45 @@ test('cadastro público: aluno confirma qualquer e-mail e ativa a própria conta
     turmaId: turma.id,
     responsavelNome: 'Responsável de Cadastro',
     responsavelEmail,
+    senha: 'Aluno-Senha-123',
   };
-  let corpoEnviado;
-  const mailService = require('../src/services/mailService');
-  const enviarOriginal = mailService.enviar;
-  let emailsEnviados = 0;
-  mailService.enviar = async (dados) => {
-    emailsEnviados += 1;
-    corpoEnviado = dados.corpo;
-    return 'TEST';
-  };
-  try {
-    const solicitado = await req('POST', '/api/auth/senha/aluno/cadastro/codigo', { body });
-    assert.strictEqual(solicitado.status, 200);
-    assert.match(solicitado.json.mensagem, /Se o e-mail puder ser usado/);
-    assert.strictEqual(await db('usuarios').where({ email }).first(), undefined);
-    const pendente = await db('cadastros_aluno_pendentes').where({ email }).first();
-    assert.ok(pendente);
-    const codigo = /Seu código de confirmação é: (\d{6})/.exec(corpoEnviado)[1];
-    assert.notStrictEqual(pendente.codigo_hash, codigo);
+  const criado = await req('POST', '/api/auth/senha/aluno/cadastro', { body });
+  assert.strictEqual(criado.status, 201);
+  assert.match(criado.json.mensagem, /Conta criada/);
+  const aluno = await db('usuarios').where({ email }).first();
+  assert.strictEqual(aluno.role, 'aluno');
+  assert.strictEqual(aluno.ativo, 1);
+  assert.ok(aluno.senha_hash);
+  assert.notStrictEqual(aluno.senha_hash, body.senha);
+  assert.strictEqual(aluno.data_nascimento, nascimento);
+  assert.strictEqual(aluno.turma_id, turma.id);
+  assert.strictEqual(aluno.deve_trocar_senha, 0);
+  assert.strictEqual(await db('cadastros_aluno_pendentes').where({ email }).first(), undefined);
+  assert.strictEqual(await db('emails_log').where({ destinatario: email }).first(), undefined);
 
-    const errado = codigo === '000000' ? '000001' : '000000';
-    const respostaErrada = await req('POST', '/api/auth/senha/aluno/cadastro/confirmar', {
-      body: { email, codigo: errado, senha: 'Aluno-Senha-123' },
-    });
-    assert.strictEqual(respostaErrada.status, 400);
-    assert.strictEqual((await db('cadastros_aluno_pendentes').where({ email }).first()).tentativas, 1);
+  const responsavel = await db('aluno_responsavel as ar')
+    .join('usuarios as r', 'r.id', 'ar.responsavel_id')
+    .where({ 'ar.aluno_id': aluno.id })
+    .first('r.nome', 'r.email');
+  assert.deepStrictEqual(responsavel, { nome: 'Responsável de Cadastro', email: responsavelEmail });
+  assert.strictEqual((await req('POST', '/api/auth/senha/login', { body: { email, senha: body.senha } })).status, 200);
 
-    const confirmado = await req('POST', '/api/auth/senha/aluno/cadastro/confirmar', {
-      body: { email, codigo, senha: 'Aluno-Senha-123' },
-    });
-    assert.strictEqual(confirmado.status, 201);
-    const aluno = await db('usuarios').where({ email }).first();
-    assert.strictEqual(aluno.role, 'aluno');
-    assert.strictEqual(aluno.ativo, 1);
-    assert.strictEqual(aluno.data_nascimento, nascimento);
-    assert.strictEqual(aluno.turma_id, turma.id);
-    assert.strictEqual(aluno.deve_trocar_senha, 0);
-    assert.strictEqual(await db('cadastros_aluno_pendentes').where({ email }).first(), undefined);
+  const duplicado = await req('POST', '/api/auth/senha/aluno/cadastro', { body });
+  assert.strictEqual(duplicado.status, 409);
 
-    const responsavel = await db('aluno_responsavel as ar')
-      .join('usuarios as r', 'r.id', 'ar.responsavel_id')
-      .where({ 'ar.aluno_id': aluno.id })
-      .first('r.nome', 'r.email');
-    assert.deepStrictEqual(responsavel, { nome: 'Responsável de Cadastro', email: responsavelEmail });
-    assert.strictEqual((await req('POST', '/api/auth/senha/login', { body: { email, senha: 'Aluno-Senha-123' } })).status, 200);
+  const senhaInvalidaEmail = `cadastro.invalido.${Date.now()}@gmail.com`;
+  const senhaInvalida = await req('POST', '/api/auth/senha/aluno/cadastro', {
+    body: { ...body, email: senhaInvalidaEmail, senha: 'curta' },
+  });
+  assert.strictEqual(senhaInvalida.status, 400);
+  assert.strictEqual(await db('usuarios').where({ email: senhaInvalidaEmail }).first(), undefined);
+});
 
-    const duplicado = await req('POST', '/api/auth/senha/aluno/cadastro/codigo', { body });
-    assert.strictEqual(duplicado.json.mensagem, solicitado.json.mensagem);
-    assert.strictEqual(emailsEnviados, 1);
-  } finally {
-    mailService.enviar = enviarOriginal;
-  }
+test('recuperação de senha: falha SMTP não deixa código ativo', async () => {
+  const aluno = await db('usuarios').where({ role: 'aluno', ativo: true }).first();
+  const redefinicao = await req('POST', '/api/auth/senha/aluno/codigo', { body: { email: aluno.email } });
+  assert.strictEqual(redefinicao.status, 503);
+  assert.strictEqual(await db('codigos_senha_aluno').where({ usuario_id: aluno.id, usado: false }).first(), undefined);
 });
 
 test('turmas: somente gestor pode criar e novas turmas aparecem no cadastro público', async () => {
@@ -536,7 +654,8 @@ test('cursos: gestor acompanha inscritos e professor ve somente as turmas vincul
     ativo: true,
     turma_ids: [],
   });
-  const tokenOutroProfessor = require('../src/middlewares/auth').assinarToken({ id: outroProfessorId });
+  const outroProfessor = { id: outroProfessorId };
+  const tokenOutroProfessor = require('../src/middlewares/auth').assinarToken({ id: outroProfessor.id });
   const nomeTurma = `Turma Cursos ${Date.now()}`;
   const criada = await req('POST', '/api/turmas', { cookie: gestor, body: { nome: nomeTurma, curso: 'Curso com Inscritos' } });
   assert.strictEqual(criada.status, 201);
@@ -577,5 +696,66 @@ test('cursos: gestor acompanha inscritos e professor ve somente as turmas vincul
   } finally {
     await db('usuarios').where({ id: alunoId }).del();
     await db('usuarios').where({ id: outroProfessorId }).del();
+  }
+});
+
+test('senha temporaria padrao atualiza somente contas de equipe autorizadas e exige troca', async () => {
+  const emailNaoAutorizado = `nao.autorizado.${Date.now()}@sp.senai.br`;
+  const [idNaoAutorizado] = await db('usuarios').insert({
+    nome: 'Professor não autorizado',
+    email: emailNaoAutorizado,
+    role: 'professor',
+    ativo: true,
+    criado_em: new Date().toISOString(),
+    atualizado_em: new Date().toISOString(),
+  }).returning('id').then((rows) => rows.map((row) => row.id || row));
+
+  try {
+    const resultado = await definirSenhaEquipe('Senai@123');
+    assert.ok(resultado.atualizados > 0);
+    assert.ok(resultado.criadas > 0);
+
+    const gestores = await db('usuarios').whereIn('email', [
+      'lmenezes@sp.senai.br',
+      'lucineide.melo@sp.senai.br',
+      'rosângela.garcia@dp.senai.br',
+      'marcelo.fazan@sp.senai.br',
+      'luiscarvalho@sp.senai.br',
+      'gguimarães@sp.senai.br',
+    ]);
+    assert.strictEqual(gestores.length, 6);
+    assert.ok(gestores.every((usuario) => usuario.role === 'gestor' && usuario.deve_trocar_senha && usuario.senha_hash));
+
+    const professores = await db('usuarios').whereIn('email', ['edilson.ferreira@sp.senai.br', 'marcos.rnunes@sp.senai.br']);
+    assert.strictEqual(professores.length, 2);
+    for (const professor of professores) {
+      assert.strictEqual(professor.role, 'professor');
+      assert.strictEqual(Boolean(professor.deve_trocar_senha), true);
+      assert.ok(professor.senha_hash);
+    }
+
+    const gestor = await db('usuarios').where({ email: 'lmenezes@sp.senai.br', role: 'gestor' }).first();
+    assert.strictEqual(Boolean(gestor.deve_trocar_senha), true);
+    const login = await req('POST', '/api/auth/senha/login', {
+      body: { email: gestor.email, senha: 'Senai@123' },
+    });
+    assert.strictEqual(login.status, 200);
+    assert.strictEqual(login.json.usuario.deve_trocar_senha, true);
+    assert.strictEqual((await req('GET', '/api/turmas', { cookie: login.cookie })).status, 403);
+    const troca = await req('POST', '/api/auth/senha/alterar', {
+      cookie: login.cookie,
+      body: { senhaAtual: 'Senai@123', novaSenha: 'Senha-Gestor-789' },
+    });
+    assert.strictEqual(troca.status, 200);
+    assert.strictEqual((await req('POST', '/api/auth/senha/login', {
+      body: { email: gestor.email, senha: 'Senai@123' },
+    })).status, 401);
+
+    const naoAutorizado = await db('usuarios').where({ id: idNaoAutorizado }).first();
+    assert.strictEqual(naoAutorizado.senha_hash, null);
+    assert.strictEqual(Boolean(naoAutorizado.deve_trocar_senha), false);
+
+  } finally {
+    await db('usuarios').where({ id: idNaoAutorizado }).del();
   }
 });

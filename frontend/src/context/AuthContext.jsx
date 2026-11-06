@@ -52,8 +52,8 @@ export function AuthProvider({ children }) {
     return data.home;
   }, []);
 
-  const loginComSenha = useCallback(async (email, senha) => {
-    const { data } = await api.post('/auth/senha/login', { email, senha });
+  const loginComSenha = useCallback(async (email, senha, perfil) => {
+    const { data } = await api.post('/auth/senha/login', { email, senha, perfil });
     setUser(data.usuario);
     setHome(data.home);
     return data;

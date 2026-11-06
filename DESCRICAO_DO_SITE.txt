@@ -1,0 +1,31 @@
+SISTEMA SENAI - DESCRICAO DO SITE
+
+OBJETIVO
+Sistema web para controle de entradas atrasadas e autorizacoes de saida antecipada de alunos.
+
+FUNCIONALIDADES
+- Cadastro publico e login de alunos por e-mail e senha.
+- Cadastro do aluno com data de nascimento, turma e dados do responsavel quando necessario.
+- Identificacao de maioridade calculada a partir da data de nascimento.
+- Login da equipe por e-mail e senha e opcao de autenticacao Google quando configurada.
+- Perfis de aluno, professor, gestor, portaria e responsavel, com acesso conforme permissao.
+- Gestor pode gerenciar usuarios, cadastrar professores, definir senhas temporarias e administrar turmas.
+- Professor pode consultar suas turmas vinculadas e os alunos inscritos nelas.
+- Registro e consulta de entradas atrasadas.
+- Solicitacao de saida antecipada e fluxo de autorizacao do responsavel para alunos menores.
+- Codigo de verificacao para autorizacao do responsavel, com validade limitada e uso unico.
+- Registro da decisao e observacao do responsavel no fluxo de saida.
+- Recuperacao de senha de aluno por codigo enviado por e-mail.
+- Auditoria de operacoes importantes.
+- Modo de demonstracao para desenvolvimento, desativado automaticamente em producao.
+
+TECNOLOGIAS
+- Interface: React e Vite.
+- API: Node.js e Express.
+- Banco de dados: SQLite para desenvolvimento; PostgreSQL ou MySQL podem ser configurados para producao.
+
+OBSERVACOES DE CONFIGURACAO
+- O envio de e-mails em producao requer configuracao SMTP.
+- O login Google requer credenciais OAuth.
+- O banco de producao deve ser configurado no ambiente de hospedagem; segredos nao estao incluidos no pacote.
+- O arquivo README.md contem instrucoes de instalacao, execucao, banco de dados e deploy.

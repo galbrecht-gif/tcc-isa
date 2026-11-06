@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const env = require('../config/env');
-const { googleEnabled, acessoTotal } = require('../config/passport');
+const { googleEnabled, emailPermitidoParaPerfil, perfisPermitidos } = require('../config/passport');
 const Usuario = require('../models/usuarioModel');
 const HttpError = require('../services/HttpError');
 const logService = require('../services/logService');
@@ -82,13 +82,20 @@ exports.entrarComSenha = async (req, res) => {
   const senha = typeof req.body?.senha === 'string' ? req.body.senha : '';
   const usuario = await Usuario.buscarPorEmail(email);
   const senhaValida = await verificarSenha(senha, usuario?.senha_hash);
-  if (!usuario || !usuario.ativo || !PERFIS.includes(usuario.role) || !usuario.senha_hash || !senhaValida) {
+  const perfil = PERFIS.includes(req.body?.perfil) ? req.body.perfil : usuario?.role;
+  const perfisEquipe = perfisPermitidos(email);
+  const perfilPermitido = usuario?.role === 'aluno'
+    ? perfil === 'aluno' || (perfisEquipe.includes(usuario.role) && perfisEquipe.includes(perfil))
+    : usuario?.role === 'professor'
+      ? perfil === 'professor'
+    : perfisEquipe.includes(usuario?.role) && perfisEquipe.includes(perfil);
+  if (!usuario || !usuario.ativo || !PERFIS.includes(usuario.role) || !usuario.senha_hash || !senhaValida || !perfilPermitido) {
     throw new HttpError(401, 'E-mail ou senha incorretos.');
   }
 
-  res.cookie(COOKIE, assinarToken(usuario), opcoesCookie());
-  logService.registrar({ idUsuario: usuario.id, acao: 'LOGIN_SENHA', depois: { email: usuario.email }, ip: req.ip });
-  res.json({ usuario: Usuario.publico(usuario), home: HOME[usuario.role] });
+  res.cookie(COOKIE, assinarToken(usuario, perfil), opcoesCookie());
+  logService.registrar({ idUsuario: usuario.id, acao: 'LOGIN_SENHA', depois: { email: usuario.email, perfil }, ip: req.ip });
+  res.json({ usuario: Usuario.publico({ ...usuario, role: perfil }), home: HOME[perfil] });
 };
 
 exports.solicitarCodigoSenhaAluno = async (req, res) => {
@@ -98,68 +105,63 @@ exports.solicitarCodigoSenhaAluno = async (req, res) => {
     const codigo = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
     const codigoHash = crypto.createHash('sha256').update(codigo).digest('hex');
     const agora = new Date();
-    await db.transaction(async (trx) => {
-      await trx('codigos_senha_aluno').where({ usuario_id: usuario.id, usado: false }).update({ usado: true });
-      await trx('codigos_senha_aluno').insert({
+    const codigoId = await db.transaction(async (trx) => {
+      const [inserido] = await trx('codigos_senha_aluno').insert({
         usuario_id: usuario.id,
         codigo_hash: codigoHash,
         expira_em: new Date(agora.getTime() + 10 * 60 * 1000).toISOString(),
         usado: false,
         tentativas: 0,
         criado_em: agora.toISOString(),
+      }).returning('id');
+      return typeof inserido === 'object' ? inserido.id : inserido;
+    });
+    try {
+      await mailService.enviar({
+        para: usuario.email,
+        assunto: 'Código para criar ou recuperar sua senha',
+        corpo: `Seu código é: ${codigo}\nEle expira em 10 minutos e só pode ser usado uma vez.`,
+        registrarLog: env.demoMode && !env.isProduction,
+        exigirEntrega: true,
       });
-    });
-    await mailService.enviar({
-      para: usuario.email,
-      assunto: 'Código para criar ou recuperar sua senha',
-      corpo: `Seu código é: ${codigo}\nEle expira em 10 minutos e só pode ser usado uma vez.`,
-      registrarLog: env.demoMode && !env.isProduction,
-    });
+    } catch (err) {
+      await db('codigos_senha_aluno').where({ id: codigoId, usado: false }).update({ usado: true });
+      throw err;
+    }
+    await db('codigos_senha_aluno')
+      .where({ usuario_id: usuario.id, usado: false })
+      .whereNot({ id: codigoId })
+      .update({ usado: true });
   }
   res.json({ mensagem: 'Se houver um cadastro ativo de aluno com esse e-mail, enviaremos um código.' });
 };
 
-exports.solicitarCodigoCadastroAluno = async (req, res) => {
+exports.criarCadastroAluno = async (req, res) => {
   const { nome, email, dataNascimento, turmaId, menor, responsavelNome, responsavelEmail } =
     await validarDadosCadastroAluno(req.body || {});
-
-  const mensagem = 'Se o e-mail puder ser usado, enviaremos um código para confirmar o cadastro.';
-  if (await Usuario.buscarPorEmail(email)) {
-    res.json({ mensagem });
-    return;
+  try {
+    validarSenha(req.body?.senha);
+  } catch (err) {
+    throw new HttpError(err.status, err.message);
   }
-
-  const codigo = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-  const agora = new Date();
-  const enviarCodigo = await db.transaction(async (trx) => {
-    await trx('cadastros_aluno_pendentes').where('expira_em', '<=', agora.toISOString()).del();
-    const pendente = await trx('cadastros_aluno_pendentes').where({ email }).first();
-    if (pendente && agora.getTime() - new Date(pendente.criado_em).getTime() < 60 * 1000) return false;
-    const cadastro = {
+  const senhaHash = await hashSenha(req.body.senha);
+  const id = await db.transaction(async (trx) => {
+    if (await trx('usuarios').whereRaw('lower(email) = ?', [email]).first()) {
+      throw new HttpError(409, 'Já existe uma conta com este e-mail. Entre pelo login.');
+    }
+    return Usuario.criarEmTransacao(trx, {
       nome,
       email,
+      role: 'aluno',
+      ativo: true,
+      senhaHash,
       data_nascimento: dataNascimento,
       turma_id: turmaId,
-      responsavel_nome: menor ? responsavelNome : null,
-      responsavel_email: menor ? responsavelEmail : null,
-      codigo_hash: crypto.createHash('sha256').update(codigo).digest('hex'),
-      expira_em: new Date(agora.getTime() + 10 * 60 * 1000).toISOString(),
-      tentativas: 0,
-      criado_em: agora.toISOString(),
-    };
-    if (pendente) await trx('cadastros_aluno_pendentes').where({ id: pendente.id }).update(cadastro);
-    else await trx('cadastros_aluno_pendentes').insert(cadastro);
-    return true;
-  });
-  if (enviarCodigo) {
-    await mailService.enviar({
-      para: email,
-      assunto: 'Confirme seu cadastro de aluno',
-      corpo: `Seu código de confirmação é: ${codigo}\nEle expira em 10 minutos e só pode ser usado uma vez.`,
-      registrarLog: env.demoMode && !env.isProduction,
+      responsaveis: menor ? [{ nome: responsavelNome, email: responsavelEmail }] : [],
     });
-  }
-  res.json({ mensagem });
+  });
+  logService.registrar({ idUsuario: id, acao: 'CADASTRO_ALUNO', depois: { email }, ip: req.ip });
+  res.status(201).json({ mensagem: 'Conta criada. Agora você já pode entrar com seu e-mail e senha.' });
 };
 
 exports.dadosCadastroGoogleAluno = (req, res) => {
@@ -190,49 +192,6 @@ exports.confirmarCadastroGoogleAluno = async (req, res) => {
   res.cookie(COOKIE, assinarToken(usuario), opcoesCookie());
   logService.registrar({ idUsuario: id, acao: 'CADASTRO_ALUNO_GOOGLE', depois: { email: dados.email }, ip: req.ip });
   res.status(201).json({ mensagem: 'Cadastro concluído.' });
-};
-
-exports.confirmarCadastroAluno = async (req, res) => {
-  const email = Usuario.normalizarEmail(req.body?.email);
-  const codigo = String(req.body?.codigo || '');
-  if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(codigo)) throw new HttpError(400, 'Código inválido ou expirado.');
-  try {
-    validarSenha(req.body?.senha);
-  } catch (err) {
-    throw new HttpError(err.status, err.message);
-  }
-  const senhaHash = await hashSenha(req.body.senha);
-  const codigoHash = crypto.createHash('sha256').update(codigo).digest('hex');
-  const resultado = await db.transaction(async (trx) => {
-    const pendente = await trx('cadastros_aluno_pendentes').where({ email }).forUpdate().first();
-    if (!pendente || pendente.tentativas >= 5 || new Date(pendente.expira_em).getTime() <= Date.now()) return null;
-    const confere = crypto.timingSafeEqual(Buffer.from(pendente.codigo_hash, 'hex'), Buffer.from(codigoHash, 'hex'));
-    if (!confere) {
-      await trx('cadastros_aluno_pendentes').where({ id: pendente.id }).increment('tentativas', 1);
-      return null;
-    }
-    if (await trx('usuarios').where({ email }).first()) {
-      await trx('cadastros_aluno_pendentes').where({ id: pendente.id }).del();
-      return null;
-    }
-    const id = await Usuario.criarEmTransacao(trx, {
-      nome: pendente.nome,
-      email: pendente.email,
-      role: 'aluno',
-      ativo: true,
-      senhaHash,
-      data_nascimento: pendente.data_nascimento,
-      turma_id: pendente.turma_id,
-      responsaveis: pendente.responsavel_email
-        ? [{ nome: pendente.responsavel_nome, email: pendente.responsavel_email }]
-        : [],
-    });
-    await trx('cadastros_aluno_pendentes').where({ id: pendente.id }).del();
-    return id;
-  });
-  if (!resultado) throw new HttpError(400, 'Código inválido ou expirado.');
-  logService.registrar({ idUsuario: resultado, acao: 'CADASTRO_ALUNO_CONFIRMADO', ip: req.ip });
-  res.status(201).json({ mensagem: 'Cadastro confirmado. Agora você pode entrar com e-mail e senha.' });
 };
 
 exports.definirSenhaAluno = async (req, res) => {
@@ -287,8 +246,7 @@ exports.alterarSenha = async (req, res) => {
   res.json({ mensagem: 'Senha alterada com sucesso.' });
 };
 
-// O perfil escolhido na tela de login precisa ser o cadastrado em "usuarios",
-// exceto contas de acesso total, que entram no perfil escolhido.
+// O perfil escolhido precisa estar autorizado para o e-mail cadastrado.
 exports.googleCallback = (req, res) => {
   const perfil = req.cookies.perfil_login;
   res.clearCookie('perfil_login');
@@ -308,9 +266,14 @@ exports.googleCallback = (req, res) => {
     });
     return res.redirect(`${env.frontendUrl}/cadastro-aluno?google=1`);
   }
-  const total = acessoTotal(req.user.email);
-  if (!total && req.user.role !== perfil) return res.redirect(`${env.frontendUrl}/login?erro=perfil_incorreto`);
-  res.cookie(COOKIE, assinarToken(req.user, total ? perfil : undefined), opcoesCookie());
+  const perfisEquipe = perfisPermitidos(req.user.email);
+  const perfilPermitido = req.user.role === 'aluno'
+    ? perfil === 'aluno' || (perfisEquipe.includes(req.user.role) && perfisEquipe.includes(perfil))
+    : req.user.role === 'professor'
+      ? perfil === 'professor'
+    : perfisEquipe.includes(req.user.role) && emailPermitidoParaPerfil(req.user.email, perfil);
+  if (!perfilPermitido) return res.redirect(`${env.frontendUrl}/login?erro=perfil_incorreto`);
+  res.cookie(COOKIE, assinarToken(req.user, perfil), opcoesCookie());
   logService.registrar({ idUsuario: req.user.id, acao: 'LOGIN_GOOGLE', depois: { email: req.user.email, perfil }, ip: req.ip });
   res.redirect(`${env.frontendUrl}/auth/callback`);
 };

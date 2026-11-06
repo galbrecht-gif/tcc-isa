@@ -8,6 +8,7 @@ import DataTable from '../components/DataTable';
 import Modal, { ConfirmModal } from '../components/Modal';
 import { ROLES } from '../utils/format';
 
+const SENHA_TEMPORARIA_EQUIPE = 'Senai@123';
 const VAZIO = { nome: '', email: '', role: 'aluno', roleOriginal: null, senhaTemporaria: '', ativo: true, data_nascimento: '', turma_id: '', responsaveis: [], turma_ids: [] };
 
 export default function GestorUsuarios() {
@@ -163,7 +164,19 @@ export default function GestorUsuarios() {
             </label>
             <label>
               Perfil
-              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} disabled={form.id === user.id}>
+              <select
+                value={form.role}
+                onChange={(e) => {
+                  const role = e.target.value;
+                  const equipe = ['professor', 'gestor', 'portaria'].includes(role);
+                  setForm({
+                    ...form,
+                    role,
+                    senhaTemporaria: equipe && !form.senhaTemporaria ? SENHA_TEMPORARIA_EQUIPE : form.senhaTemporaria,
+                  });
+                }}
+                disabled={form.id === user.id}
+              >
                 {Object.entries(ROLES).map(([k, v]) => (
                   <option key={k} value={k} disabled={k === 'responsavel' && !form.id}>
                     {v}
@@ -171,6 +184,13 @@ export default function GestorUsuarios() {
                 ))}
               </select>
               {!form.id && <small className="texto-suave">Responsáveis são criados ao vincular a um aluno.</small>}
+              {['professor', 'gestor', 'portaria'].includes(form.role) && (
+                <small className="texto-suave">
+                  {form.role === 'professor'
+                    ? 'Informe o e-mail do professor e use a senha temporária padrão Senai@123. Ele deverá criar uma senha pessoal no primeiro acesso.'
+                    : 'O e-mail deve estar autorizado para o perfil selecionado. Gestores também podem acessar a Portaria.'}
+                </small>
+              )}
             </label>
             <label className="check">
               <input type="checkbox" checked={form.ativo} onChange={(e) => setForm({ ...form, ativo: e.target.checked })} disabled={form.id === user.id} />
@@ -189,7 +209,7 @@ export default function GestorUsuarios() {
                   onChange={(e) => setForm({ ...form, senhaTemporaria: e.target.value })}
                   required={!form.id || form.roleOriginal !== form.role}
                 />
-                <small className="texto-suave">O usuário deverá criar uma senha pessoal no primeiro acesso.</small>
+                <small className="texto-suave">Senha temporária padrão: Senai@123. O usuário deverá criar uma senha pessoal no primeiro acesso.</small>
               </label>
             )}
 

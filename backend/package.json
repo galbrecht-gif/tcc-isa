@@ -9,6 +9,7 @@
     "migrate": "knex migrate:latest --knexfile knexfile.js",
     "seed": "node database/seed.js",
     "criar-gestor-inicial": "node scripts/criar-gestor-inicial.js",
+    "definir-senha-equipe": "node scripts/definir-senha-equipe.js",
     "setup": "npm run migrate",
     "test": "node --test test/fluxos.test.js"
   },

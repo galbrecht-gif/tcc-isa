@@ -23,9 +23,9 @@ async function seed(db) {
     return typeof r === 'object' ? r.id : r;
   };
 
-  await novo({ nome: 'Luciano Menezes de Jesus', email: 'daniellap.cunha@gmail.com', role: 'gestor' });
-  const professorId = await novo({ nome: 'Marcos Nunes', email: 'isabelly.d.rosa@aluno.senai.br', role: 'professor' });
-  await novo({ nome: 'Funcionário Portaria', email: 'leticiamarque13@gmail.com', role: 'portaria' });
+  await novo({ nome: 'Gestor de Demonstração', email: 'lmenezes@sp.senai.br', role: 'gestor' });
+  const professorId = await novo({ nome: 'Professor de Demonstração', email: 'marcos.rnunes@sp.senai.br', role: 'professor' });
+  await novo({ nome: 'Portaria de Demonstração', email: 'lucineide.melo@sp.senai.br', role: 'portaria' });
 
   const [t] = await db('turmas').insert({ nome: 'DEV 2', curso: 'Desenvolvimento de Sistemas', professor_id: professorId });
   const turmaId = typeof t === 'object' ? t.id : t;

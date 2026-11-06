@@ -43,11 +43,10 @@ button, input, select, textarea { font: inherit; }
 .texto-suave { color: var(--cinza-texto); font-size: 0.9rem; margin: 0; }
 .texto-ok { color: var(--verde); font-weight: 600; }
 
-/* Marca SENAI */
+/* Marca institucional */
 .marca { display: flex; flex-direction: column; gap: 2px; line-height: 1; }
 .marca-logo {
-  font-weight: 900; font-size: 1.6rem; letter-spacing: 0.04em; color: var(--vermelho);
-  display: inline-block; padding-bottom: 5px; border-bottom: 4px solid var(--vermelho); width: fit-content;
+  display: block; width: min(100%, 130px); height: auto;
 }
 .marca-sub { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--cinza-texto); margin-top: 6px; font-weight: 600; }
 .marca-clara .marca-sub { color: #aeb2b9; }
@@ -90,7 +89,7 @@ button, input, select, textarea { font: inherit; }
 .sidebar .marca { padding: 4px 10px 26px; }
 .sidebar-recolhida .sidebar { width: var(--sidebar-w-recolhida); }
 .sidebar-recolhida .marca-sub { display: none; }
-.sidebar-recolhida .marca-logo { font-size: 0.95rem; letter-spacing: 0; }
+.sidebar-recolhida .marca-logo { width: 52px; }
 .sidebar nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .nav-item {
   display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px;
@@ -267,36 +266,27 @@ legend { font-weight: 700; padding: 0 6px; }
 .toast-error { border-left-color: var(--vermelho); }
 
 /* Login e publico */
-.login-tela { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
-.login-lado {
-  background: radial-gradient(circle at 15% 10%, #3a1013 0%, var(--grafite) 45%, #0e0e10 100%);
-  color: var(--branco); display: flex; flex-direction: column; justify-content: space-between; padding: 44px 52px; gap: 24px;
-  border-right: 8px solid var(--vermelho);
-}
-.login-hero { max-width: 580px; }
-.login-hero h1 { font-size: clamp(2rem, 3vw, 2.8rem); line-height: 1.1; max-width: 520px; letter-spacing: -0.035em; }
-.login-hero p { color: #c4c7cc; max-width: 460px; line-height: 1.55; margin: 16px 0 24px; }
-.login-beneficios { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-.login-beneficios li { display: flex; align-items: center; gap: 10px; color: #e6e8eb; }
-.login-beneficios svg { color: var(--vermelho); flex-shrink: 0; }
-.login-rodape { color: #8d9199; }
-.login-caixa { display: flex; align-items: center; justify-content: center; padding: 36px clamp(24px, 5vw, 64px); background: linear-gradient(145deg, #f7f8fa, #eceef2); overflow-y: auto; }
-.login-conteudo { display: flex; flex-direction: column; gap: 22px; width: 100%; max-width: 500px; padding: 32px; background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: 20px; box-shadow: 0 18px 48px rgba(16, 24, 40, 0.1); }
-.login-cabecalho { display: flex; flex-direction: column; gap: 7px; }
+.login-tela { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+.login-identidade { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 24px 36px 0; }
+.login-identidade .marca-logo { width: min(100%, 150px); }
+.login-identidade .marca-sub { color: var(--cinza-texto); }
+.login-caixa { min-height: 0; display: flex; align-items: center; justify-content: center; padding: 10px; background: linear-gradient(180deg, #ffffff, #f3f4f6); }
+.login-conteudo { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 500px; padding: 16px 24px; background: var(--branco); border: 1px solid var(--cinza-borda); border-top: 5px solid var(--vermelho); border-radius: 16px; box-shadow: 0 18px 48px rgba(16, 24, 40, 0.1); }
+.login-cabecalho { display: flex; flex-direction: column; gap: 5px; }
 .login-etiqueta { color: var(--vermelho); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .login-conteudo h2 { font-size: 1.75rem; margin: 0; letter-spacing: -0.025em; }
-.login-secao { display: flex; flex-direction: column; gap: 14px; }
+.login-secao { display: flex; flex-direction: column; gap: 10px; }
 .login-secao h3 { font-size: 0.95rem; margin: 0; }
-.login-form { gap: 12px; }
-.login-form label { gap: 7px; }
-.login-form input { min-height: 44px; }
-.login-form .btn { margin-top: 2px; min-height: 46px; }
-.login-links { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid var(--cinza); }
+.login-form { gap: 8px; }
+.login-form label { gap: 5px; }
+.login-form input { min-height: 32px; }
+.login-form .btn { margin-top: 2px; min-height: 40px; }
+.login-links { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 6px; border-top: 1px solid var(--cinza); }
 .login-links .link-btn { font-size: 0.84rem; }
-.login-google { padding-top: 20px; border-top: 1px solid var(--cinza-borda); }
+.login-google { padding-top: 8px; border-top: 1px solid var(--cinza-borda); }
 .login-secao-cabecalho { display: flex; flex-direction: column; gap: 4px; }
 .login-secao-cabecalho .texto-suave { font-size: 0.84rem; }
-.login-responsavel { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 7px; padding: 13px 15px; border-radius: 12px; background: #f7f8fa; color: var(--cinza-texto); font-size: 0.82rem; }
+.login-responsavel { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 7px; padding: 9px 15px; border-radius: 12px; background: #f7f8fa; color: var(--cinza-texto); font-size: 0.82rem; }
 .login-responsavel svg { color: var(--vermelho); }
 .login-responsavel a { color: var(--vermelho-escuro); font-weight: 700; text-decoration: none; }
 .login-responsavel a:hover { text-decoration: underline; }
@@ -312,13 +302,13 @@ legend { font-weight: 700; padding: 0 6px; }
 .demo-aluno select { padding: 9px; border: 1px solid var(--cinza-borda); border-radius: 10px; min-width: 0; }
 .demo-perfis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .perfil-card {
-  display: flex; align-items: flex-start; gap: 10px; min-height: 76px; text-align: left; padding: 13px; background: var(--branco);
+  display: flex; align-items: flex-start; gap: 10px; min-height: 54px; text-align: left; padding: 6px 10px; background: var(--branco);
   border: 1px solid var(--cinza-borda); border-radius: 12px; cursor: pointer; color: var(--grafite); text-decoration: none; transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 .perfil-card > svg { color: var(--vermelho); flex-shrink: 0; margin-top: 1px; }
 .perfil-card-texto { display: flex; flex-direction: column; gap: 4px; }
 .perfil-card-texto strong { font-size: 0.88rem; }
-.perfil-card-texto > span { color: var(--cinza-texto); font-size: 0.76rem; line-height: 1.35; }
+.perfil-card-texto > span { color: var(--cinza-texto); font-size: 0.74rem; line-height: 1.2; }
 .perfil-card:hover { border-color: var(--vermelho); box-shadow: 0 6px 18px rgba(227, 6, 19, 0.14); transform: translateY(-2px); }
 .publico-tela { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: linear-gradient(180deg, var(--cinza) 0%, #e9ebef 100%); }
 .publico-caixa { background: var(--branco); border-radius: 16px; border-top: 6px solid var(--vermelho); box-shadow: var(--sombra-forte); padding: 30px; width: 100%; max-width: 540px; }
@@ -329,12 +319,8 @@ legend { font-weight: 700; padding: 0 6px; }
 .publico-caixa .demo-bloco { margin-top: 22px; }
 
 @media (max-width: 900px) {
-  .login-tela { grid-template-columns: 1fr; }
-  .login-lado { padding: 26px; border-right: none; border-bottom: 6px solid var(--vermelho); min-height: 280px; }
-  .login-hero h1 { font-size: 1.6rem; }
-  .login-beneficios, .login-rodape { display: none; }
-  .login-hero p { margin-bottom: 0; }
   .login-caixa { padding: 28px 20px; }
+  .login-identidade { padding: 20px 24px 0; }
   .login-conteudo { max-width: 560px; padding: 26px; }
   .sidebar { position: fixed; left: -290px; z-index: 60; transition: left 0.2s; width: var(--sidebar-w) !important; }
   .sidebar-mobile-aberta .sidebar { left: 0; }
@@ -348,13 +334,14 @@ legend { font-weight: 700; padding: 0 6px; }
   .cursos-form { grid-template-columns: 1fr; }
   .cursos-form .form-acoes { grid-column: auto; }
   .demo-aluno { grid-template-columns: 1fr; }
+  .demo-perfis { grid-template-columns: 1fr; }
+  .perfil-card { min-height: 66px; }
   .sino-painel { position: fixed; left: 10px; right: 10px; width: auto; top: 70px; }
 }
 
 @media (max-width: 520px) {
   .login-conteudo { gap: 19px; padding: 22px 18px; border-radius: 16px; }
+  .login-identidade { padding: 18px 18px 0; }
   .login-conteudo h2 { font-size: 1.5rem; }
   .login-links { align-items: flex-start; flex-direction: column; gap: 10px; }
-  .demo-perfis { grid-template-columns: 1fr; }
-  .perfil-card { min-height: 66px; }
 }

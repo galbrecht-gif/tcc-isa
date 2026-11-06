@@ -2,6 +2,7 @@ const db = require('../config/database');
 const Usuario = require('../models/usuarioModel');
 const HttpError = require('../services/HttpError');
 const { hashSenha, validarSenha } = require('../services/passwordService');
+const { emailPermitidoParaPerfil } = require('../config/equipePermitida');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -18,6 +19,9 @@ async function validar(body, idAtual) {
   if (dup && dup.id !== idAtual) throw new HttpError(409, 'Ja existe um usuario com este e-mail.');
 
   const funcionario = ['professor', 'gestor', 'portaria'].includes(role);
+  if (funcionario && role !== 'professor' && !emailPermitidoParaPerfil(email, role)) {
+    throw new HttpError(400, 'Este e-mail não está autorizado para o perfil de equipe selecionado.');
+  }
   const atual = idAtual ? await Usuario.buscarPorId(idAtual) : null;
   const exigeSenhaTemporaria = funcionario && (!atual || atual.role !== role);
   const dados = { nome, email, role, ativo: body.ativo !== false };

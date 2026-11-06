@@ -2,17 +2,13 @@ const passport = require('passport');
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 const env = require('./env');
 const Usuario = require('../models/usuarioModel');
+const {
+  emailAutorizadoParaCadastroEquipe,
+  emailPermitidoParaPerfil,
+  perfisPermitidos,
+} = require('./equipePermitida');
 
 const googleEnabled = Boolean(env.google.clientId && env.google.clientSecret);
-
-function acessoTotal(email) {
-  return env.acessoTotalEmails.includes(String(email || '').trim().toLowerCase());
-}
-
-function emailInstitucionalPermitido(email) {
-  const match = /^([^\s@]+)@([^\s@]+)$/.exec(String(email || '').trim().toLowerCase());
-  return Boolean(match && env.senaiEmailDomains.includes(match[2]));
-}
 
 if (googleEnabled) {
   passport.use(
@@ -36,9 +32,16 @@ if (googleEnabled) {
             }
             contaEncontrada = true;
             if (!usuario.ativo) continue;
-            if (usuario.role === 'aluno' || acessoTotal(e.value) || emailInstitucionalPermitido(e.value)) return done(null, usuario);
+            if (
+              usuario.role === 'aluno' ||
+              usuario.role === 'professor' ||
+              emailPermitidoParaPerfil(e.value, usuario.role)
+            ) {
+              return done(null, usuario);
+            }
           }
           if (!contaEncontrada && emailParaCadastro) {
+            if (emailAutorizadoParaCadastroEquipe(emailParaCadastro)) return done(null, false);
             return done(null, {
               cadastroGoogleAluno: true,
               email: Usuario.normalizarEmail(emailParaCadastro),
@@ -54,4 +57,4 @@ if (googleEnabled) {
   );
 }
 
-module.exports = { passport, googleEnabled, emailInstitucionalPermitido, acessoTotal };
+module.exports = { passport, googleEnabled, emailPermitidoParaPerfil, perfisPermitidos };

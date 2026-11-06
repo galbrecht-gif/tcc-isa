@@ -3,12 +3,13 @@ const env = require('../config/env');
 const Usuario = require('../models/usuarioModel');
 const HttpError = require('../services/HttpError');
 const { asyncHandler } = require('./errorHandler');
+const { emailPermitidoParaPerfil, perfisPermitidos } = require('../config/equipePermitida');
 
 const COOKIE = 'token';
 
 const PERFIS = ['aluno', 'professor', 'gestor', 'portaria'];
 
-// "perfil" so e honrado para contas de acesso total (ACESSO_TOTAL_EMAILS).
+// E-mails autorizados para mais de um perfil de equipe podem alternar no login.
 function assinarToken(usuario, perfil) {
   const payload = { sub: usuario.id };
   if (PERFIS.includes(perfil)) payload.perfil = perfil;
@@ -40,8 +41,15 @@ const autenticar = asyncHandler(async (req, res, next) => {
   ) {
     throw new HttpError(403, 'Troque sua senha temporaria antes de continuar.');
   }
-  const total = env.acessoTotalEmails.includes(String(usuario.email).toLowerCase());
-  req.user = total && PERFIS.includes(payload.perfil) ? { ...usuario, role: payload.perfil } : usuario;
+  const perfilOriginalPermitido =
+    usuario.role === 'aluno' || usuario.role === 'professor' || emailPermitidoParaPerfil(usuario.email, usuario.role);
+  if (!perfilOriginalPermitido) throw new HttpError(403, 'Acesso não autorizado para este perfil.');
+  const perfisEquipe = perfisPermitidos(usuario.email);
+  const perfilTokenPermitido =
+    PERFIS.includes(payload.perfil) &&
+    (payload.perfil === usuario.role ||
+      (perfisEquipe.includes(usuario.role) && emailPermitidoParaPerfil(usuario.email, payload.perfil)));
+  req.user = perfilTokenPermitido ? { ...usuario, role: payload.perfil } : usuario;
   next();
 });
 
