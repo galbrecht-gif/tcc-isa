@@ -4,7 +4,7 @@
   "description": "API do Sistema de Controle Digital de Entrada Atrasada e Saida Antecipada - SENAI",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "npm run migrate && node src/server.js",
     "dev": "node --watch src/server.js",
     "migrate": "knex migrate:latest --knexfile knexfile.js",
     "seed": "node database/seed.js",

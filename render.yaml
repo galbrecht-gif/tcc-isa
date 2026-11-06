@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install --prefix backend && npm install --prefix frontend --include=dev && npm run build --prefix frontend
-    startCommand: npm run migrate --prefix backend && npm start --prefix backend
+    startCommand: npm start --prefix backend
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
